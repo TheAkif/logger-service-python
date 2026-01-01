@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: lis-logs-postgres
+    environment:
+      POSTGRES_USER: lis
+      POSTGRES_PASSWORD: lis
+      POSTGRES_DB: lis_logs
+    ports:
+      - "5433:5432"
+    volumes:
+      - lis_logs_pg:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: lis-logs-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: lis
+      RABBITMQ_DEFAULT_PASS: lis
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - lis_logs_rmq:/var/lib/rabbitmq
+
+volumes:
+  lis_logs_pg:
+  lis_logs_rmq:
