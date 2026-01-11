@@ -104,10 +104,10 @@ class DHLikeLogShape(LoadTestShape):
     We convert target logs/sec -> users using PER_USER_LOGS_PER_SEC.
     """
     stages = [
-        {"duration_s": 10 * 60, "target_lps": 2000, "spawn_rate": 500},
-        {"duration_s": 5 * 60,  "target_lps": 10000, "spawn_rate": 1500},
+        {"duration_s": 5 * 60, "target_lps": 2000, "spawn_rate": 500},
+        {"duration_s": 2 * 60,  "target_lps": 10000, "spawn_rate": 1500},
         {"duration_s": 60,      "target_lps": 30000, "spawn_rate": 3000},
-        {"duration_s": 2 * 60,  "target_lps": 2000, "spawn_rate": 2000},
+        {"duration_s": 60,  "target_lps": 2000, "spawn_rate": 2000},
     ]
 
     def tick(self):
@@ -117,7 +117,7 @@ class DHLikeLogShape(LoadTestShape):
         for s in self.stages:
             elapsed += s["duration_s"]
             if run_time < elapsed:
-                users = math.ceil(s["target_lps"] / PER_USER_LOGS_PER_SEC)
+                users = math.ceil(s["target_lps"] / 5)
                 return (users, s["spawn_rate"])
 
         return None
