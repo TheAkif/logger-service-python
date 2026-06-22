@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16
-    container_name: lis-logs-postgres
+    container_name: lis-postgres
     environment:
       POSTGRES_USER: lis
       POSTGRES_PASSWORD: lis
@@ -9,20 +9,30 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - lis_logs_pg:/var/lib/postgresql/data
+      - lis_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lis -d lis_logs"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: lis-logs-rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: lis
-      RABBITMQ_DEFAULT_PASS: lis
+  lis:
+    build: .
+    container_name: lis-app
     ports:
-      - "5672:5672"
-      - "15672:15672"
-    volumes:
-      - lis_logs_rmq:/var/lib/rabbitmq
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://lis:lis@postgres:5432/lis_logs
+      INGEST_TOKEN: ${INGEST_TOKEN:-}
+      ENV: ${ENV:-dev}
+      BATCH_MAX: ${BATCH_MAX:-500}
+      BATCH_FLUSH_SEC: ${BATCH_FLUSH_SEC:-2}
+      QUEUE_MAX: ${QUEUE_MAX:-20000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "python scripts/migrate.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
 volumes:
-  lis_logs_pg:
-  lis_logs_rmq:
+  lis_pg:
