@@ -62,8 +62,8 @@ def truncate_tables(db_setup):
 
 
 # ── Function-scoped async fixtures ────────────────────────────────────────────
-# Everything here — the batcher task, the route handler, and the test function
-# — runs in the SAME function-scoped event loop, so asyncio tasks scheduled in
+# Everything here - the batcher task, the route handler, and the test function
+# - runs in the SAME function-scoped event loop, so asyncio tasks scheduled in
 # the batcher are visible to awaits in the test body.
 
 @pytest.fixture
