@@ -18,7 +18,7 @@ async def test_ready(async_client: AsyncClient):
     assert resp.json() == {"status": "ready"}
 
 
-# ── POST /v1/logs — auth ─────────────────────────────────────────────────────
+# ── POST /v1/logs - auth ─────────────────────────────────────────────────────
 
 async def test_post_log_no_token(async_client: AsyncClient, sample_log: dict):
     resp = await async_client.post("/v1/logs", json=sample_log)
@@ -33,7 +33,7 @@ async def test_post_log_wrong_token(async_client: AsyncClient, sample_log: dict)
     assert resp.status_code == 401
 
 
-# ── POST /v1/logs — happy path ────────────────────────────────────────────────
+# ── POST /v1/logs - happy path ────────────────────────────────────────────────
 
 async def test_post_log_returns_202(
     async_client: AsyncClient, auth_headers: dict, sample_log: dict
@@ -43,7 +43,7 @@ async def test_post_log_returns_202(
     assert resp.json()["accepted"] is True
 
 
-# ── POST /v1/logs — validation ───────────────────────────────────────────────
+# ── POST /v1/logs - validation ───────────────────────────────────────────────
 
 async def test_post_log_missing_required_field(
     async_client: AsyncClient, auth_headers: dict, sample_log: dict

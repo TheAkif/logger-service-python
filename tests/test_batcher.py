@@ -81,7 +81,7 @@ async def test_flush_error_does_not_raise(
     with patch("app.repo.insert_batch", new_callable=AsyncMock) as mock_insert:
         mock_insert.side_effect = Exception("simulated DB failure")
         await async_client.post("/v1/logs", json=sample_log, headers=auth_headers)
-        # Must not raise — flush errors are handled internally
+        # Must not raise - flush errors are handled internally
         await main_module.batcher.flush_now()
 
     assert main_module.batcher.flush_errors >= 1

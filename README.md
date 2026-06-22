@@ -1,4 +1,4 @@
-# LIS — Log Ingestor Service
+# LIS - Log Ingestor Service
 
 A lightweight, high-throughput microservice for collecting structured log events from any number of applications and persisting them to PostgreSQL. Built with FastAPI and asyncpg.
 
@@ -22,8 +22,8 @@ LIS receives structured log events over HTTP, buffers them in-memory, and flushe
 
 | Method | Path | Auth | Description |
 | ------ | ---- | ---- | ----------- |
-| `GET` | `/health` | No | Liveness probe — always returns `200 ok` |
-| `GET` | `/ready` | No | Readiness probe — returns `503` if DB is unreachable |
+| `GET` | `/health` | No | Liveness probe - always returns `200 ok` |
+| `GET` | `/ready` | No | Readiness probe - returns `503` if DB is unreachable |
 | `POST` | `/v1/logs` | Yes | Ingest a single log event |
 | `POST` | `/v1/logs/batch` | Yes | Ingest up to 500 log events in one call |
 | `GET` | `/internal/batcher` | No | Live batcher stats (queued, flushed, errors) |
@@ -78,11 +78,11 @@ Optional fields for richer context:
 
 LIS is a backend ingest sink. Any service that can make an HTTP POST can send logs to it.
 
-- **Backend services** (Node, Python, Go, Java, .NET) — send app, audit, and access logs
-- **Frontend / browser apps** — send UI errors, unhandled promise rejections, user action trails
-- **Mobile apps** — send crash reports and usage events via a thin SDK wrapper
-- **API gateways / proxies** — forward access logs in bulk using the batch endpoint
-- **CI/CD pipelines** — emit audit events on deployments, releases, and config changes
+- **Backend services** (Node, Python, Go, Java, .NET) - send app, audit, and access logs
+- **Frontend / browser apps** - send UI errors, unhandled promise rejections, user action trails
+- **Mobile apps** - send crash reports and usage events via a thin SDK wrapper
+- **API gateways / proxies** - forward access logs in bulk using the batch endpoint
+- **CI/CD pipelines** - emit audit events on deployments, releases, and config changes
 
 ---
 
@@ -90,7 +90,7 @@ LIS is a backend ingest sink. Any service that can make an HTTP POST can send lo
 
 **Centralised observability.** Instead of every team writing logs to different places in different formats, everything flows through one schema-validated endpoint into one queryable table.
 
-**Low-impact on callers.** The service responds `202 Accepted` immediately. Callers do not wait for the DB write — the batcher handles that asynchronously in the background.
+**Low-impact on callers.** The service responds `202 Accepted` immediately. Callers do not wait for the DB write - the batcher handles that asynchronously in the background.
 
 **Resilient by default.** If the DB is temporarily unavailable, failed batches are preserved in the dead-letter table rather than silently dropped. The DB connection retries automatically on startup.
 
@@ -132,8 +132,8 @@ All configuration is via environment variables. See [.env.example](.env.example)
 
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
-| `DATABASE_URL` | — | PostgreSQL connection string (required) |
-| `INGEST_TOKEN` | — | Bearer token for auth (required outside `dev`) |
+| `DATABASE_URL` | - | PostgreSQL connection string (required) |
+| `INGEST_TOKEN` | - | Bearer token for auth (required outside `dev`) |
 | `ENV` | `dev` | `dev` \| `staging` \| `prod` |
 | `BATCH_MAX` | `500` | Flush when buffer reaches this many events |
 | `BATCH_FLUSH_SEC` | `2` | Also flush every N seconds regardless of size |
@@ -150,7 +150,7 @@ docker compose up -d postgres
 pytest
 ```
 
-The test suite uses a real PostgreSQL database (`lis_test`) and covers ingest endpoints, batcher flush behaviour, dead-letter routing, and repository atomicity — 24 tests in total.
+The test suite uses a real PostgreSQL database (`lis_test`) and covers ingest endpoints, batcher flush behaviour, dead-letter routing, and repository atomicity - 24 tests in total.
 
 ---
 
