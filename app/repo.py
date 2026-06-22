@@ -70,5 +70,5 @@ async def insert_batch(events: List[LogEvent]) -> None:
         ))
 
     async with pool.acquire() as conn:
-        # MVP bulk insert (fast enough for now). We can switch to COPY later.
-        await conn.executemany(_INSERT_SQL, rows)
+        async with conn.transaction():
+            await conn.executemany(_INSERT_SQL, rows)
