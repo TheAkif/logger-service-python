@@ -15,5 +15,8 @@ venv/
 .coverage
 htmlcov/
 
+# Claude Code IDE integration (local only)
+.claude/
+
 # Local planning docs
 execution.md
