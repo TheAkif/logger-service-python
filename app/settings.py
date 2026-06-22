@@ -1,7 +1,8 @@
 import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://lis:lis@localhost:5433/lis_logs")
-INGEST_TOKEN = os.getenv("INGEST_TOKEN", "dev-token")
+INGEST_TOKEN = os.getenv("INGEST_TOKEN", "")
+ENV = os.getenv("ENV", "dev")
 
 DB_POOL_MIN = int(os.getenv("DB_POOL_MIN", "1"))
 DB_POOL_MAX = int(os.getenv("DB_POOL_MAX", "10"))

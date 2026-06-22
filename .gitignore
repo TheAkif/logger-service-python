@@ -1,2 +1,22 @@
+# Python cache
 __pycache__/
 *.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environments
+.env
+.venv/
+venv/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Claude Code IDE integration (local only)
+.claude/
+
+# Local planning docs
+execution.md
