@@ -90,8 +90,8 @@ async def test_flush_error_does_not_raise(
 # ── batcher stats endpoint ────────────────────────────────────────────────────
 
 async def test_batcher_stats_endpoint(async_client: AsyncClient):
-    resp = await async_client.get("/internal/batcher")
+    resp = await async_client.get("/internal/health")
     assert resp.status_code == 200
     data = resp.json()
-    for key in ("enqueued", "flushed", "dropped", "flush_errors", "queued"):
+    for key in ("enqueued", "flushed", "dropped", "flush_errors", "queued", "uptime_sec", "last_flush_at"):
         assert key in data
