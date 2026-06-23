@@ -3,8 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional, List
+from uuid import UUID
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic.alias_generators import to_camel
 
 
 class Environment(str, Enum):
@@ -109,6 +111,44 @@ class BatchIngestResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     accepted: bool = True
     count: int = Field(ge=0)
+
+
+class LogRecord(BaseModel):
+    """A log event as returned from the database."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+    id: UUID
+    received_at: datetime
+    occurred_at: datetime
+    tenant_id: str
+    source: str
+    environment: str
+    level: str
+    type: str
+    message: str
+    trace_id: Optional[str] = None
+    span_id: Optional[str] = None
+    correlation_id: Optional[str] = None
+    request_id: Optional[str] = None
+    user_id: Optional[str] = None
+    path: Optional[str] = None
+    method: Optional[str] = None
+    status_code: Optional[int] = None
+    duration_ms: Optional[int] = None
+    exception: Optional[Dict[str, Any]] = None
+    properties: Optional[Dict[str, Any]] = None
+
+
+class LogQueryResponse(BaseModel):
+    total: int
+    page: int
+    limit: int
+    items: List[LogRecord]
 
 
 # ---- Swagger Examples ----

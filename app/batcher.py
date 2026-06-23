@@ -1,4 +1,5 @@
 import asyncio
+import datetime as _dt
 import json
 import logging
 import time
@@ -6,7 +7,7 @@ from typing import List, Optional
 
 from .models import LogEvent
 from .settings import BATCH_MAX, BATCH_FLUSH_SEC, QUEUE_MAX
-from . import repo
+from . import metrics, repo
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,11 @@ class Batcher:
         self.dropped = 0
         self.flushed = 0
         self.flush_errors = 0
+        self._started_at: float = 0.0
+        self._last_flush_at: Optional[str] = None
 
     async def start(self) -> None:
+        self._started_at = time.monotonic()
         self._task = asyncio.create_task(self._run(), name="log-batcher")
         logger.info("batcher_started", extra={"queue_max": QUEUE_MAX, "batch_max": BATCH_MAX})
 
@@ -40,9 +44,12 @@ class Batcher:
         try:
             self._q.put_nowait(e)
             self.enqueued += 1
+            metrics.events_enqueued_total.inc()
+            metrics.queue_depth.set(self._q.qsize())
             return True
         except asyncio.QueueFull:
             self.dropped += 1
+            metrics.events_dropped_total.inc()
             logger.warning("batcher_queue_full", extra={"dropped_total": self.dropped})
             return False
 
@@ -69,13 +76,19 @@ class Batcher:
         t0 = time.monotonic()
         try:
             await repo.insert_batch(batch)
+            elapsed = time.monotonic() - t0
             self.flushed += len(batch)
+            self._last_flush_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
+            metrics.events_flushed_total.inc(len(batch))
+            metrics.flush_duration_seconds.observe(elapsed)
+            metrics.queue_depth.set(self._q.qsize())
             logger.info(
                 "batch_flushed",
-                extra={"count": len(batch), "duration_ms": round((time.monotonic() - t0) * 1000)},
+                extra={"count": len(batch), "duration_ms": round(elapsed * 1000)},
             )
         except Exception as exc:
             self.flush_errors += 1
+            metrics.flush_errors_total.inc()
             logger.error("batch_flush_error", extra={"count": len(batch), "error": str(exc)})
             await self._write_dead_letter(batch, exc)
 
