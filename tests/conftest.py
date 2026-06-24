@@ -42,7 +42,8 @@ def db_setup():
 
         conn = await asyncpg.connect(_TEST_DB_URL)
         for sql_file in sorted(_MIGRATIONS_DIR.glob("*.sql")):
-            await conn.execute(sql_file.read_text())
+            sql = sql_file.read_text()
+            await conn.execute(sql)
         await conn.close()
 
     asyncio.run(_setup())
@@ -50,15 +51,18 @@ def db_setup():
 
 @pytest.fixture(autouse=True)
 def truncate_tables(db_setup):
-    """Wipe all data tables before each test for full isolation."""
+    """Wipe all data tables and in-process rate limit state before each test."""
     async def _truncate():
         conn = await asyncpg.connect(_TEST_DB_URL)
         await conn.execute(
-            "TRUNCATE log_events, failed_batches RESTART IDENTITY CASCADE"
+            "TRUNCATE log_events, failed_batches, api_keys, tenants RESTART IDENTITY CASCADE"
         )
         await conn.close()
 
     asyncio.run(_truncate())
+
+    from app import ratelimit
+    ratelimit._windows.clear()
 
 
 # ── Function-scoped async fixtures ────────────────────────────────────────────
