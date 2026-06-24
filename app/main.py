@@ -7,8 +7,10 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
+from pathlib import Path
+
 from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .logging_config import setup_logging
@@ -68,6 +70,12 @@ async def ready():
         return {"status": "ready"}
     except Exception:
         raise HTTPException(status_code=503, detail="db not ready")
+
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard():
+    html = (Path(__file__).parent / "static" / "dashboard.html").read_text(encoding="utf-8")
+    return HTMLResponse(content=html)
 
 
 # ---- Ingest -----------------------------------------------------------------
