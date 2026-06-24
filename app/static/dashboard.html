@@ -1,234 +1,383 @@
 <!DOCTYPE html>
-<html lang="en" x-data="dashboard()" x-init="init()">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LIS Dashboard</title>
+
+  <!-- Prevent theme flash before Alpine loads -->
+  <script>
+    if (localStorage.getItem('lis_theme') !== 'light') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
   <style>
     [x-cloak] { display: none !important; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #111827; }
-    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+    body {
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .mono {
+      font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { border-radius: 4px; }
+    .dark ::-webkit-scrollbar-thumb { background: #374151; }
+    :not(.dark) ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+    .card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+    }
+    .dark .card {
+      background: #1e2433;
+      border-color: #2d3448;
+    }
+
+    .stat-number { font-variant-numeric: tabular-nums; }
+
+    .badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
   </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen" style="font-family: ui-monospace, 'Cascadia Code', monospace;">
 
-<!-- ==================== AUTH SCREEN ==================== -->
-<div x-show="!authenticated" x-cloak class="fixed inset-0 bg-gray-950 flex items-center justify-center z-50">
-  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-md shadow-2xl">
-    <div class="flex items-center gap-3 mb-2">
-      <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-sm">LIS</div>
-      <div>
-        <h1 class="text-lg font-semibold text-white leading-tight">Log Ingestor Service</h1>
-        <p class="text-xs text-gray-500">Dashboard</p>
+<body
+  class="min-h-screen bg-slate-100 dark:bg-[#111827] text-slate-800 dark:text-slate-100 transition-colors duration-150"
+  x-data="dashboard()"
+  x-init="init()"
+>
+
+<!-- ======================================================
+     AUTH SCREEN
+====================================================== -->
+<div x-show="!authenticated" x-cloak
+  class="fixed inset-0 flex items-center justify-center z-50 bg-slate-100 dark:bg-[#111827] p-4">
+
+  <div class="card w-full max-w-sm shadow-xl p-8">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
       </div>
+      <div>
+        <div class="text-base font-semibold text-slate-900 dark:text-white leading-tight">LIS Dashboard</div>
+        <div class="text-xs text-slate-400">Log Ingestor Service</div>
+      </div>
+      <!-- Theme toggle on auth screen -->
+      <button @click="toggleTheme()" class="ml-auto p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+        <svg x-show="darkMode" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <svg x-show="!darkMode" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
+      </button>
     </div>
-
-    <div class="my-6 h-px bg-gray-800"></div>
 
     <div class="space-y-4">
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5 uppercase tracking-widest">API Key</label>
+        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-widest">API Key</label>
         <input
           type="password"
           x-model="authInput.key"
           @keydown.enter="login()"
           placeholder="lis_..."
-          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+          class="w-full rounded-lg px-3.5 py-2.5 text-sm border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-300 dark:border-slate-600
+                 text-slate-900 dark:text-slate-100
+                 placeholder-slate-400 dark:placeholder-slate-500
+                 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         />
       </div>
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5 uppercase tracking-widest">Default Tenant <span class="text-gray-600 normal-case">(optional)</span></label>
+        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-widest">
+          Default Tenant <span class="normal-case text-slate-400">(optional)</span>
+        </label>
         <input
           type="text"
           x-model="authInput.tenantId"
           @keydown.enter="login()"
           placeholder="acme"
-          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+          class="w-full rounded-lg px-3.5 py-2.5 text-sm border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-300 dark:border-slate-600
+                 text-slate-900 dark:text-slate-100
+                 placeholder-slate-400 dark:placeholder-slate-500
+                 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         />
       </div>
 
-      <div x-show="authError" class="text-xs text-red-400 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2" x-text="authError"></div>
+      <div x-show="authError" x-cloak
+        class="text-xs rounded-lg px-3 py-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400"
+        x-text="authError">
+      </div>
 
-      <button
-        @click="login()"
-        class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
-      >
-        Open Dashboard
+      <button @click="login()"
+        class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-colors text-sm shadow-sm shadow-indigo-500/30">
+        Sign in
       </button>
-      <button
-        @click="loginDev()"
-        class="w-full bg-transparent hover:bg-gray-800 text-gray-500 hover:text-gray-300 border border-gray-800 hover:border-gray-700 font-medium py-2.5 rounded-lg transition-colors text-sm"
-      >
+      <button @click="loginDev()"
+        class="w-full text-sm font-medium py-2.5 rounded-lg transition-colors border
+               text-slate-500 dark:text-slate-400
+               border-slate-200 dark:border-slate-700
+               hover:bg-slate-50 dark:hover:bg-slate-800
+               hover:text-slate-700 dark:hover:text-slate-200">
         Dev mode (no auth)
       </button>
     </div>
   </div>
 </div>
 
-<!-- ==================== MAIN APP ==================== -->
+
+<!-- ======================================================
+     MAIN APP
+====================================================== -->
 <div x-show="authenticated" x-cloak class="flex flex-col min-h-screen">
 
-  <!-- Top Bar -->
-  <header class="bg-gray-900 border-b border-gray-800 px-5 py-2.5 flex items-center justify-between sticky top-0 z-40 gap-4 flex-wrap">
-    <div class="flex items-center gap-3">
-      <div class="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-[10px]">LIS</div>
-      <span class="text-sm font-semibold text-white">Log Ingestor</span>
-    </div>
+  <!-- ---- Header ---- -->
+  <header class="sticky top-0 z-40 border-b
+                 bg-white dark:bg-[#1a2035]
+                 border-slate-200 dark:border-[#2d3448]
+                 shadow-sm">
+    <div class="px-5 h-14 flex items-center gap-4">
 
-    <div class="flex items-center gap-3 flex-wrap">
+      <!-- Logo -->
+      <div class="flex items-center gap-2.5 shrink-0">
+        <div class="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <span class="text-sm font-semibold text-slate-900 dark:text-white hidden sm:block">LIS</span>
+      </div>
+
+      <div class="h-5 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+
       <!-- Tenant -->
       <div class="flex items-center gap-2">
-        <span class="text-[10px] text-gray-500 uppercase tracking-widest hidden sm:block">Tenant</span>
+        <span class="text-xs text-slate-400 hidden md:block">Tenant</span>
         <input
           type="text"
           x-model="tenantId"
           @change="onTenantChange()"
           placeholder="all tenants"
-          class="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-xs text-white w-32 focus:outline-none focus:border-indigo-500 placeholder-gray-600 transition-colors"
+          class="rounded-md px-3 py-1.5 text-xs border outline-none transition-colors w-32
+                 bg-slate-50 dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 placeholder-slate-400
+                 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
         />
       </div>
 
       <!-- Time range -->
-      <select
-        x-model="timeRange"
-        @change="refresh()"
-        class="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-colors"
-      >
+      <select x-model="timeRange" @change="refresh()"
+        class="rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+               bg-slate-50 dark:bg-slate-800
+               border-slate-200 dark:border-slate-600
+               text-slate-700 dark:text-slate-200
+               focus:border-indigo-400">
         <option value="1h">Last 1h</option>
         <option value="6h">Last 6h</option>
         <option value="24h">Last 24h</option>
         <option value="7d">Last 7d</option>
       </select>
 
-      <!-- Live indicator -->
-      <button
-        @click="toggleAutoRefresh()"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs transition-colors"
-        :class="autoRefresh ? 'border-green-800 text-green-400 bg-green-950/30' : 'border-gray-700 text-gray-500'"
-      >
-        <span x-show="autoRefresh" class="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+      <!-- Spacer -->
+      <div class="flex-1"></div>
+
+      <!-- Live badge -->
+      <button @click="toggleAutoRefresh()"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors"
+        :class="autoRefresh
+          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+          : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-600 hover:text-slate-600 dark:hover:text-slate-200'">
+        <span x-show="autoRefresh" class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
         <span x-text="autoRefresh ? 'Live' : 'Paused'"></span>
       </button>
 
-      <!-- Manual refresh -->
-      <button
-        @click="refresh()"
-        :disabled="loading"
-        class="px-3 py-1.5 rounded-md border border-gray-700 text-xs text-gray-400 hover:text-white hover:border-gray-500 transition-colors disabled:opacity-40"
-      >
-        Refresh
+      <!-- Refresh -->
+      <button @click="refresh()" :disabled="loading"
+        class="px-3 py-1.5 rounded-md text-xs border transition-colors disabled:opacity-40
+               bg-slate-50 dark:bg-slate-800
+               border-slate-200 dark:border-slate-600
+               text-slate-500 dark:text-slate-400
+               hover:text-slate-700 dark:hover:text-slate-200
+               hover:border-slate-300 dark:hover:border-slate-500">
+        <svg x-show="!loading" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <svg x-show="loading" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </button>
+
+      <!-- Theme toggle -->
+      <button @click="toggleTheme()"
+        class="p-1.5 rounded-md border transition-colors
+               bg-slate-50 dark:bg-slate-800
+               border-slate-200 dark:border-slate-600
+               text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+        <svg x-show="darkMode" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <svg x-show="!darkMode" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
       </button>
 
       <!-- Logout -->
-      <button @click="logout()" class="text-xs text-gray-600 hover:text-red-400 transition-colors">Logout</button>
+      <button @click="logout()" class="text-xs text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors ml-1">
+        Logout
+      </button>
     </div>
   </header>
 
-  <!-- Error Banner -->
-  <div
-    x-show="globalError"
-    x-cloak
-    class="bg-red-950/40 border-b border-red-900/40 px-5 py-2 text-xs text-red-300 flex items-center justify-between"
-  >
+  <!-- Error banner -->
+  <div x-show="globalError" x-cloak
+    class="px-5 py-2.5 text-xs border-b flex items-center justify-between
+           bg-red-50 dark:bg-red-950/30
+           border-red-200 dark:border-red-800/40
+           text-red-600 dark:text-red-400">
     <span x-text="globalError"></span>
-    <button @click="globalError = null" class="text-red-600 hover:text-red-400 ml-4 transition-colors">dismiss</button>
+    <button @click="globalError = null" class="ml-4 font-medium hover:underline">Dismiss</button>
   </div>
 
-  <!-- Content -->
+  <!-- ---- Content ---- -->
   <main class="p-5 space-y-5 flex-1">
 
     <!-- Stat Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <template x-for="card in statCards" :key="card.label">
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-1">
-          <div class="text-[10px] text-gray-500 uppercase tracking-widest" x-text="card.label"></div>
-          <div class="text-2xl font-semibold leading-tight" :class="card.color" x-text="card.value"></div>
-          <div class="text-[11px] text-gray-600" x-text="card.sub"></div>
+        <div class="card p-5 flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-widest" x-text="card.label"></span>
+            <div class="w-7 h-7 rounded-md flex items-center justify-center" :class="card.iconBg">
+              <span class="text-sm" x-text="card.icon"></span>
+            </div>
+          </div>
+          <div class="text-3xl font-bold stat-number leading-none" :class="card.color" x-text="card.value"></div>
+          <div class="text-xs text-slate-400 dark:text-slate-500" x-text="card.sub"></div>
         </div>
       </template>
     </div>
 
-    <!-- Charts Row -->
+    <!-- Charts row -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
       <!-- Timeline (2/3) -->
-      <div class="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <div class="lg:col-span-2 card p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xs font-medium text-gray-400 uppercase tracking-widest">Events over time</h2>
-          <div x-show="tenantId" class="flex gap-1">
-            <button
-              @click="timelineInterval = 'hour'; loadTimeline()"
-              class="text-[11px] px-2 py-0.5 rounded transition-colors"
-              :class="timelineInterval === 'hour' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'"
-            >Hour</button>
-            <button
-              @click="timelineInterval = 'day'; loadTimeline()"
-              class="text-[11px] px-2 py-0.5 rounded transition-colors"
-              :class="timelineInterval === 'day' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'"
-            >Day</button>
+          <div>
+            <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Events over time</h2>
+            <p class="text-xs text-slate-400 mt-0.5" x-text="tenantId ? 'Tenant: ' + tenantId : 'All tenants (set tenant for analytics)'"></p>
+          </div>
+          <div x-show="tenantId" class="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
+            <button @click="timelineInterval = 'hour'; loadTimeline()"
+              class="text-xs px-3 py-1 rounded transition-colors"
+              :class="timelineInterval === 'hour'
+                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'">
+              Hour
+            </button>
+            <button @click="timelineInterval = 'day'; loadTimeline()"
+              class="text-xs px-3 py-1 rounded transition-colors"
+              :class="timelineInterval === 'day'
+                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'">
+              Day
+            </button>
           </div>
         </div>
         <div class="relative h-52">
           <canvas id="timelineChart"></canvas>
-          <div
-            x-show="!tenantId"
-            class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-700"
-          >
-            <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
-            <span class="text-xs">Set a tenant to see analytics</span>
+          <div x-show="!tenantId"
+            class="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-slate-300 dark:text-slate-600">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <span class="text-sm font-medium">Enter a tenant to see the timeline</span>
           </div>
         </div>
       </div>
 
-      <!-- Level Breakdown (1/3) -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h2 class="text-xs font-medium text-gray-400 uppercase tracking-widest mb-4">Level breakdown</h2>
+      <!-- Level breakdown (1/3) -->
+      <div class="card p-5 shadow-sm">
+        <div class="mb-4">
+          <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Level breakdown</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Distribution by severity</p>
+        </div>
         <div class="relative h-52">
           <canvas id="levelChart"></canvas>
-          <div
-            x-show="!tenantId"
-            class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-700"
-          >
-            <svg class="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
-            <span class="text-xs">Set a tenant</span>
+          <div x-show="!tenantId"
+            class="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-slate-300 dark:text-slate-600">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+            </svg>
+            <span class="text-sm font-medium">Set a tenant</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Top Sources -->
-    <div x-show="tenantId" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <h2 class="text-xs font-medium text-gray-400 uppercase tracking-widest mb-4">Top sources</h2>
-      <div class="relative h-36">
+    <div x-show="tenantId" class="card p-5 shadow-sm">
+      <div class="mb-4">
+        <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Top sources</h2>
+        <p class="text-xs text-slate-400 mt-0.5">Events by origin service</p>
+      </div>
+      <div class="relative h-40">
         <canvas id="sourcesChart"></canvas>
       </div>
     </div>
 
     <!-- Log Stream -->
-    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div class="card shadow-sm overflow-hidden">
 
-      <!-- Filter Bar -->
-      <div class="p-4 border-b border-gray-800 flex items-center gap-3 flex-wrap">
-        <h2 class="text-xs font-medium text-gray-400 uppercase tracking-widest shrink-0">Log stream</h2>
+      <!-- Filter bar -->
+      <div class="px-5 py-3.5 border-b border-slate-200 dark:border-[#2d3448] flex items-center gap-3 flex-wrap bg-slate-50 dark:bg-slate-800/40">
+        <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200 shrink-0">Log stream</h2>
 
-        <input
-          type="text"
-          x-model="filters.source"
-          @input.debounce.400ms="filterLogs()"
-          placeholder="source..."
-          class="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-xs text-white w-28 focus:outline-none focus:border-indigo-500 placeholder-gray-600 transition-colors"
-        />
+        <input type="text" x-model="filters.source" @input.debounce.400ms="filterLogs()" placeholder="Source..."
+          class="w-28 rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 placeholder-slate-400
+                 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20" />
 
-        <select
-          x-model="filters.level"
-          @change="filterLogs()"
-          class="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-colors"
-        >
+        <select x-model="filters.level" @change="filterLogs()"
+          class="rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 focus:border-indigo-400">
           <option value="">All levels</option>
           <option value="debug">debug</option>
           <option value="info">info</option>
@@ -237,97 +386,111 @@
           <option value="fatal">fatal</option>
         </select>
 
-        <select
-          x-model="filters.environment"
-          @change="filterLogs()"
-          class="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-colors"
-        >
+        <select x-model="filters.environment" @change="filterLogs()"
+          class="rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 focus:border-indigo-400">
           <option value="">All envs</option>
           <option value="dev">dev</option>
           <option value="staging">staging</option>
           <option value="prod">prod</option>
         </select>
 
-        <input
-          type="text"
-          x-model="filters.q"
-          @input.debounce.400ms="filterLogs()"
-          placeholder="search messages..."
-          class="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-xs text-white flex-1 min-w-40 focus:outline-none focus:border-indigo-500 placeholder-gray-600 transition-colors"
-        />
+        <input type="text" x-model="filters.q" @input.debounce.400ms="filterLogs()" placeholder="Search messages..."
+          class="flex-1 min-w-36 rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 placeholder-slate-400
+                 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20" />
 
-        <span class="text-[11px] text-gray-600 ml-auto shrink-0" x-show="total > 0" x-text="total.toLocaleString() + ' events'"></span>
+        <span x-show="total > 0" class="text-xs text-slate-400 ml-auto shrink-0 mono"
+          x-text="total.toLocaleString() + ' events'"></span>
       </div>
 
       <!-- Table -->
       <div class="overflow-x-auto">
         <table class="w-full text-xs">
           <thead>
-            <tr class="border-b border-gray-800 text-gray-500">
-              <th class="text-left px-4 py-2.5 font-normal whitespace-nowrap">Time</th>
-              <th class="text-left px-4 py-2.5 font-normal">Level</th>
-              <th class="text-left px-4 py-2.5 font-normal">Tenant</th>
-              <th class="text-left px-4 py-2.5 font-normal">Source</th>
-              <th class="text-left px-4 py-2.5 font-normal">Env</th>
-              <th class="text-left px-4 py-2.5 font-normal w-full">Message</th>
+            <tr class="border-b border-slate-200 dark:border-[#2d3448] bg-slate-50 dark:bg-slate-800/30">
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Time</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Level</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Tenant</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Source</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Env</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400 w-full">Message</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-slate-100 dark:divide-[#2d3448]">
+
             <tr x-show="loading && logs.length === 0">
-              <td colspan="6" class="px-4 py-10 text-center text-gray-700">
+              <td colspan="6" class="px-4 py-12 text-center text-slate-400 dark:text-slate-600">
                 <div class="flex items-center justify-center gap-2">
-                  <svg class="animate-spin w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  <span>Loading...</span>
+                  <svg class="animate-spin w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Loading...
                 </div>
               </td>
             </tr>
+
             <tr x-show="!loading && logs.length === 0">
-              <td colspan="6" class="px-4 py-10 text-center text-gray-700">No logs found</td>
+              <td colspan="6" class="px-4 py-12 text-center text-slate-400 dark:text-slate-600">
+                No log events found for the selected filters
+              </td>
             </tr>
 
             <template x-for="log in logs" :key="log.id">
-              <tr
-                @click="selectedLog = selectedLog?.id === log.id ? null : log"
-                class="border-b border-gray-800/60 hover:bg-gray-800/40 cursor-pointer transition-colors"
-                :class="selectedLog?.id === log.id ? 'bg-gray-800/50' : ''"
-              >
-                <td class="px-4 py-2 text-gray-500 whitespace-nowrap" x-text="fmtTime(log.occurred_at)"></td>
-                <td class="px-4 py-2">
-                  <span
-                    class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide"
-                    :class="levelBadge(log.level)"
-                    x-text="log.level"
-                  ></span>
+              <tr @click="selectedLog = selectedLog?.id === log.id ? null : log"
+                class="cursor-pointer transition-colors"
+                :class="selectedLog?.id === log.id
+                  ? 'bg-indigo-50 dark:bg-indigo-950/30'
+                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'">
+                <td class="px-4 py-2.5 whitespace-nowrap mono text-slate-400" x-text="fmtTime(log.occurred_at)"></td>
+                <td class="px-4 py-2.5">
+                  <span class="badge" :class="levelBadge(log.level)" x-text="log.level"></span>
                 </td>
-                <td class="px-4 py-2 text-gray-400 whitespace-nowrap" x-text="log.tenant_id"></td>
-                <td class="px-4 py-2 text-gray-400 whitespace-nowrap" x-text="log.source"></td>
-                <td class="px-4 py-2 text-gray-500" x-text="log.environment"></td>
-                <td class="px-4 py-2 text-gray-200 max-w-xl">
-                  <span class="truncate block" x-text="log.message"></span>
+                <td class="px-4 py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap" x-text="log.tenant_id"></td>
+                <td class="px-4 py-2.5 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap" x-text="log.source"></td>
+                <td class="px-4 py-2.5 text-slate-400 whitespace-nowrap" x-text="log.environment"></td>
+                <td class="px-4 py-2.5 text-slate-700 dark:text-slate-200 max-w-xl">
+                  <span class="block truncate" x-text="log.message"></span>
                 </td>
               </tr>
 
-              <!-- Expanded Detail -->
-              <tr x-show="selectedLog?.id === log.id" class="bg-gray-800/20">
-                <td colspan="6" class="px-4 py-4 border-b border-gray-800/60">
-                  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
+              <!-- Expanded detail -->
+              <tr x-show="selectedLog?.id === log.id" class="bg-indigo-50/60 dark:bg-indigo-950/20">
+                <td colspan="6" class="px-5 py-4 border-b border-indigo-100 dark:border-indigo-900/30">
+
+                  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
                     <template x-for="[k, v] in detailFields(log)" :key="k">
                       <div>
-                        <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5" x-text="k"></div>
-                        <div class="text-[11px] text-gray-300 break-all" x-text="v"></div>
+                        <div class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1" x-text="k"></div>
+                        <div class="text-xs text-slate-700 dark:text-slate-300 mono break-all" x-text="v"></div>
                       </div>
                     </template>
                   </div>
+
                   <template x-if="log.exception">
                     <div class="mt-3">
-                      <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5">Exception</div>
-                      <pre class="bg-red-950/30 border border-red-900/30 rounded-lg px-3 py-2 text-[11px] text-red-300 overflow-x-auto leading-relaxed" x-text="JSON.stringify(log.exception, null, 2)"></pre>
+                      <div class="text-[10px] font-semibold text-red-500 uppercase tracking-widest mb-1.5">Exception</div>
+                      <pre class="rounded-lg px-4 py-3 text-[11px] overflow-x-auto leading-relaxed mono
+                                  bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40
+                                  text-red-700 dark:text-red-300"
+                           x-text="JSON.stringify(log.exception, null, 2)"></pre>
                     </div>
                   </template>
+
                   <template x-if="log.properties">
                     <div class="mt-3">
-                      <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5">Properties</div>
-                      <pre class="bg-gray-800/60 border border-gray-700/60 rounded-lg px-3 py-2 text-[11px] text-gray-300 overflow-x-auto leading-relaxed" x-text="JSON.stringify(log.properties, null, 2)"></pre>
+                      <div class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Properties</div>
+                      <pre class="rounded-lg px-4 py-3 text-[11px] overflow-x-auto leading-relaxed mono
+                                  bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                                  text-slate-700 dark:text-slate-300"
+                           x-text="JSON.stringify(log.properties, null, 2)"></pre>
                     </div>
                   </template>
                 </td>
@@ -338,68 +501,77 @@
       </div>
 
       <!-- Pagination -->
-      <div x-show="total > limit" class="p-3 border-t border-gray-800 flex items-center justify-between">
-        <button
-          @click="prevPage()"
-          :disabled="page === 1"
-          class="text-xs text-gray-500 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded-md border border-gray-700 hover:border-gray-500 transition-colors"
-        >Prev</button>
-        <span class="text-xs text-gray-600" x-text="`Page ${page} of ${Math.ceil(total / limit)}`"></span>
-        <button
-          @click="nextPage()"
-          :disabled="page >= Math.ceil(total / limit)"
-          class="text-xs text-gray-500 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded-md border border-gray-700 hover:border-gray-500 transition-colors"
-        >Next</button>
+      <div x-show="total > limit"
+        class="px-5 py-3 border-t border-slate-200 dark:border-[#2d3448] flex items-center justify-between bg-slate-50 dark:bg-slate-800/20">
+        <button @click="prevPage()" :disabled="page === 1"
+          class="text-xs px-3 py-1.5 rounded-md border transition-colors disabled:opacity-30
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-500 dark:text-slate-400
+                 hover:text-slate-700 dark:hover:text-slate-200">
+          Previous
+        </button>
+        <span class="text-xs text-slate-400 mono" x-text="`Page ${page} of ${Math.ceil(total / limit)}`"></span>
+        <button @click="nextPage()" :disabled="page >= Math.ceil(total / limit)"
+          class="text-xs px-3 py-1.5 rounded-md border transition-colors disabled:opacity-30
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-500 dark:text-slate-400
+                 hover:text-slate-700 dark:hover:text-slate-200">
+          Next
+        </button>
       </div>
     </div>
 
   </main>
 </div>
 
-<!-- ==================== SCRIPT ==================== -->
+<!-- ======================================================
+     SCRIPT
+====================================================== -->
 <script>
 function dashboard() {
   return {
+    darkMode: localStorage.getItem('lis_theme') !== 'light',
+
     // Auth
     authenticated: false,
     authInput: { key: '', tenantId: '' },
     authError: null,
     apiKey: '',
 
-    // Tenant / time
+    // Filters / pagination
     tenantId: '',
     timeRange: '24h',
     timelineInterval: 'hour',
-
-    // Logs
-    logs: [],
-    total: 0,
+    filters: { level: '', source: '', environment: '', q: '' },
     page: 1,
     limit: 50,
-    selectedLog: null,
-    filters: { level: '', source: '', environment: '', q: '' },
 
-    // Analytics
+    // Data
+    logs: [],
+    total: 0,
+    selectedLog: null,
     summary: null,
 
-    // Chart instances
+    // Charts
     _charts: {},
 
-    // UI
+    // UI state
     loading: false,
     globalError: null,
     autoRefresh: true,
     _timer: null,
 
-    // ---- Computed stat cards ----
+    // ---- Stat cards ----
     get statCards() {
       const s = this.summary;
       if (!s) {
         return [
-          { label: 'Total events', value: '--', color: 'text-white', sub: 'select a tenant' },
-          { label: 'Errors + Fatal', value: '--', color: 'text-red-400', sub: '' },
-          { label: 'Warnings', value: '--', color: 'text-yellow-400', sub: '' },
-          { label: 'Matching logs', value: this.total > 0 ? this.total.toLocaleString() : '0', color: 'text-indigo-400', sub: 'in table' },
+          { label: 'Total events', value: '--', color: 'text-slate-700 dark:text-slate-200', sub: 'select a tenant', icon: '📊', iconBg: 'bg-slate-100 dark:bg-slate-700' },
+          { label: 'Errors', value: '--', color: 'text-red-500', sub: '', icon: '🔴', iconBg: 'bg-red-50 dark:bg-red-950/40' },
+          { label: 'Warnings', value: '--', color: 'text-amber-500', sub: '', icon: '🟡', iconBg: 'bg-amber-50 dark:bg-amber-950/40' },
+          { label: 'Matching', value: this.total > 0 ? this.total.toLocaleString() : '0', color: 'text-indigo-600 dark:text-indigo-400', sub: 'in table', icon: '🔍', iconBg: 'bg-indigo-50 dark:bg-indigo-950/40' },
         ];
       }
       const bl = s.by_level || {};
@@ -408,21 +580,16 @@ function dashboard() {
       const warns = bl.warn || bl.warning || 0;
       const errPct = grand > 0 ? ((errors / grand) * 100).toFixed(1) : '0';
       return [
-        { label: 'Total events', value: grand.toLocaleString(), color: 'text-white', sub: 'in selected range' },
-        { label: 'Errors + Fatal', value: errors.toLocaleString(), color: errors > 0 ? 'text-red-400' : 'text-gray-400', sub: errPct + '% error rate' },
-        { label: 'Warnings', value: warns.toLocaleString(), color: warns > 0 ? 'text-yellow-400' : 'text-gray-400', sub: '' },
-        { label: 'Matching logs', value: this.total.toLocaleString(), color: 'text-indigo-400', sub: 'in table' },
+        { label: 'Total events', value: grand.toLocaleString(), color: 'text-slate-800 dark:text-white', sub: 'in selected range', icon: '📊', iconBg: 'bg-slate-100 dark:bg-slate-700' },
+        { label: 'Errors + Fatal', value: errors.toLocaleString(), color: errors > 0 ? 'text-red-500' : 'text-slate-400', sub: errPct + '% error rate', icon: '🔴', iconBg: 'bg-red-50 dark:bg-red-950/40' },
+        { label: 'Warnings', value: warns.toLocaleString(), color: warns > 0 ? 'text-amber-500' : 'text-slate-400', sub: '', icon: '🟡', iconBg: 'bg-amber-50 dark:bg-amber-950/40' },
+        { label: 'Matching logs', value: this.total.toLocaleString(), color: 'text-indigo-600 dark:text-indigo-400', sub: 'in table', icon: '🔍', iconBg: 'bg-indigo-50 dark:bg-indigo-950/40' },
       ];
     },
 
-    // ---- Lifecycle ----
-
+    // ---- Init ----
     init() {
-      Chart.defaults.color = '#6b7280';
-      Chart.defaults.borderColor = '#1f2937';
-      Chart.defaults.font.family = "ui-monospace, 'Cascadia Code', monospace";
-      Chart.defaults.font.size = 11;
-
+      this._applyTheme();
       const key = localStorage.getItem('lis_key');
       if (key !== null) {
         this.apiKey = key;
@@ -432,6 +599,29 @@ function dashboard() {
       }
     },
 
+    toggleTheme() {
+      this.darkMode = !this.darkMode;
+      localStorage.setItem('lis_theme', this.darkMode ? 'dark' : 'light');
+      this._applyTheme();
+      // Redraw charts with updated color scheme
+      if (this.tenantId && this.summary) {
+        this.$nextTick(() => {
+          this._renderLevel(this.summary.by_level || {});
+        });
+        this.loadTimeline().catch(() => {});
+        this._fetch('/v1/analytics/top-sources', {
+          tenant_id: this.tenantId,
+          n: 8,
+          ...this._timeWindow(),
+        }).then(sources => this.$nextTick(() => this._renderSources(sources))).catch(() => {});
+      }
+    },
+
+    _applyTheme() {
+      document.documentElement.classList.toggle('dark', this.darkMode);
+    },
+
+    // ---- Auth ----
     login() {
       this.authError = null;
       this.apiKey = this.authInput.key.trim();
@@ -464,13 +654,11 @@ function dashboard() {
       this.refresh();
     },
 
+    // ---- Auto refresh ----
     toggleAutoRefresh() {
       this.autoRefresh = !this.autoRefresh;
-      if (this.autoRefresh) {
-        this._startTimer();
-      } else {
-        clearInterval(this._timer);
-      }
+      if (this.autoRefresh) this._startTimer();
+      else clearInterval(this._timer);
     },
 
     _startTimer() {
@@ -478,8 +666,7 @@ function dashboard() {
       this._timer = setInterval(() => this.refresh(), 15000);
     },
 
-    // ---- API helpers ----
-
+    // ---- API ----
     _headers() {
       const h = { 'Content-Type': 'application/json' };
       if (this.apiKey) h['Authorization'] = `Bearer ${this.apiKey}`;
@@ -490,8 +677,10 @@ function dashboard() {
       const now = new Date();
       const map = { '1h': 1, '6h': 6, '24h': 24, '7d': 168 };
       const hrs = map[this.timeRange] || 24;
-      const from = new Date(now.getTime() - hrs * 3_600_000);
-      return { from_dt: from.toISOString(), to_dt: now.toISOString() };
+      return {
+        from_dt: new Date(now.getTime() - hrs * 3_600_000).toISOString(),
+        to_dt: now.toISOString(),
+      };
     },
 
     async _fetch(path, params = {}) {
@@ -507,8 +696,7 @@ function dashboard() {
       return resp.json();
     },
 
-    // ---- Load ----
-
+    // ---- Data loading ----
     async refresh() {
       if (this.loading) return;
       this.loading = true;
@@ -587,6 +775,13 @@ function dashboard() {
     },
 
     // ---- Charts ----
+    _chartDefaults() {
+      const dark = this.darkMode;
+      return {
+        textColor: dark ? '#94a3b8' : '#64748b',
+        gridColor: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
+      };
+    },
 
     _destroyCharts() {
       for (const c of Object.values(this._charts)) c?.destroy();
@@ -597,6 +792,7 @@ function dashboard() {
       const ctx = document.getElementById('timelineChart');
       if (!ctx) return;
       this._charts.timeline?.destroy();
+      const { textColor, gridColor } = this._chartDefaults();
       this._charts.timeline = new Chart(ctx, {
         type: 'line',
         data: {
@@ -605,11 +801,12 @@ function dashboard() {
             label: 'Events',
             data: buckets.map(b => b.count),
             borderColor: '#6366f1',
-            backgroundColor: 'rgba(99,102,241,0.08)',
+            backgroundColor: this.darkMode ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.08)',
             fill: true,
             tension: 0.35,
             pointRadius: buckets.length < 30 ? 3 : 0,
-            pointHoverRadius: 4,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#6366f1',
             borderWidth: 2,
           }],
         },
@@ -617,10 +814,27 @@ function dashboard() {
           responsive: true,
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: this.darkMode ? '#1e2433' : '#ffffff',
+              titleColor: textColor,
+              bodyColor: this.darkMode ? '#e2e8f0' : '#1e293b',
+              borderColor: this.darkMode ? '#2d3448' : '#e2e8f0',
+              borderWidth: 1,
+              padding: 10,
+            },
+          },
           scales: {
-            x: { grid: { color: '#1f2937' }, ticks: { maxTicksLimit: 10 } },
-            y: { grid: { color: '#1f2937' }, beginAtZero: true, ticks: { precision: 0 } },
+            x: {
+              grid: { color: gridColor },
+              ticks: { color: textColor, maxTicksLimit: 10, font: { size: 11 } },
+            },
+            y: {
+              grid: { color: gridColor },
+              ticks: { color: textColor, precision: 0, font: { size: 11 } },
+              beginAtZero: true,
+            },
           },
         },
       });
@@ -631,34 +845,43 @@ function dashboard() {
       if (!ctx) return;
       this._charts.level?.destroy();
       const PALETTE = {
-        debug: '#374151',
-        info: '#6366f1',
-        warn: '#f59e0b',
+        debug:   '#94a3b8',
+        info:    '#6366f1',
+        warn:    '#f59e0b',
         warning: '#f59e0b',
-        error: '#ef4444',
-        fatal: '#7c3aed',
+        error:   '#ef4444',
+        fatal:   '#7c3aed',
       };
       const labels = Object.keys(byLevel).filter(k => byLevel[k] > 0);
       if (!labels.length) return;
+      const { textColor } = this._chartDefaults();
       this._charts.level = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels,
           datasets: [{
             data: labels.map(l => byLevel[l]),
-            backgroundColor: labels.map(l => PALETTE[l] || '#4b5563'),
+            backgroundColor: labels.map(l => PALETTE[l] || '#64748b'),
             borderWidth: 0,
-            hoverOffset: 4,
+            hoverOffset: 5,
           }],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          cutout: '68%',
+          cutout: '65%',
           plugins: {
             legend: {
               position: 'right',
-              labels: { boxWidth: 10, padding: 14, font: { size: 11 } },
+              labels: { color: textColor, boxWidth: 10, padding: 14, font: { size: 11 } },
+            },
+            tooltip: {
+              backgroundColor: this.darkMode ? '#1e2433' : '#ffffff',
+              titleColor: textColor,
+              bodyColor: this.darkMode ? '#e2e8f0' : '#1e293b',
+              borderColor: this.darkMode ? '#2d3448' : '#e2e8f0',
+              borderWidth: 1,
+              padding: 10,
             },
           },
         },
@@ -670,6 +893,7 @@ function dashboard() {
       if (!ctx) return;
       this._charts.sources?.destroy();
       if (!sources.length) return;
+      const { textColor, gridColor } = this._chartDefaults();
       this._charts.sources = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -677,26 +901,42 @@ function dashboard() {
           datasets: [{
             label: 'Events',
             data: sources.map(s => s.count),
-            backgroundColor: '#6366f1',
-            borderRadius: 3,
-            hoverBackgroundColor: '#818cf8',
+            backgroundColor: this.darkMode ? 'rgba(99,102,241,0.7)' : 'rgba(99,102,241,0.85)',
+            hoverBackgroundColor: '#6366f1',
+            borderRadius: 4,
           }],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           indexAxis: 'y',
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: this.darkMode ? '#1e2433' : '#ffffff',
+              titleColor: textColor,
+              bodyColor: this.darkMode ? '#e2e8f0' : '#1e293b',
+              borderColor: this.darkMode ? '#2d3448' : '#e2e8f0',
+              borderWidth: 1,
+              padding: 10,
+            },
+          },
           scales: {
-            x: { grid: { color: '#1f2937' }, beginAtZero: true, ticks: { precision: 0 } },
-            y: { grid: { display: false } },
+            x: {
+              grid: { color: gridColor },
+              ticks: { color: textColor, precision: 0, font: { size: 11 } },
+              beginAtZero: true,
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: textColor, font: { size: 11 } },
+            },
           },
         },
       });
     },
 
-    // ---- Helpers ----
-
+    // ---- Formatters ----
     fmtTime(iso) {
       if (!iso) return '';
       const d = new Date(iso);
@@ -714,13 +954,13 @@ function dashboard() {
 
     levelBadge(level) {
       return {
-        debug:   'bg-gray-700 text-gray-400',
-        info:    'bg-indigo-900/70 text-indigo-300',
-        warn:    'bg-yellow-900/60 text-yellow-300',
-        warning: 'bg-yellow-900/60 text-yellow-300',
-        error:   'bg-red-900/60 text-red-300',
-        fatal:   'bg-purple-900/60 text-purple-300',
-      }[level] || 'bg-gray-700 text-gray-400';
+        debug:   'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+        info:    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300',
+        warn:    'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
+        warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
+        error:   'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+        fatal:   'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300',
+      }[level] || 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
     },
 
     detailFields(log) {
@@ -737,7 +977,7 @@ function dashboard() {
         ['Duration', log.duration_ms != null ? log.duration_ms + 'ms' : null],
         ['Type', log.type],
         ['Occurred', log.occurred_at],
-      ].filter(([, v]) => v !== null && v !== undefined);
+      ].filter(([, v]) => v !== null && v !== undefined && v !== '');
     },
   };
 }
