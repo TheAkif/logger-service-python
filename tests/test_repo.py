@@ -112,7 +112,8 @@ async def test_insert_batch_with_all_fields(async_client):
         assert row["trace_id"] == "trace-abc"
         assert row["user_id"] == "user-42"
         assert row["status_code"] == 200
-        # asyncpg returns JSONB columns as JSON strings without a registered codec
-        assert json.loads(row["properties"]) == {"key": "value"}
+        # raw asyncpg connection (no codec): JSONB comes back as a JSON string
+        import json as _json
+        assert _json.loads(row["properties"]) == {"key": "value"}
     finally:
         await conn.close()
