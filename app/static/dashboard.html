@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LIS Dashboard</title>
+
+  <!-- Prevent theme flash before Alpine loads -->
+  <script>
+    if (localStorage.getItem('lis_theme') !== 'light') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+
+    body {
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .mono {
+      font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { border-radius: 4px; }
+    .dark ::-webkit-scrollbar-thumb { background: #374151; }
+    :not(.dark) ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+    .card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+    }
+    .dark .card {
+      background: #1e2433;
+      border-color: #2d3448;
+    }
+
+    .stat-number { font-variant-numeric: tabular-nums; }
+
+    .badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+
+<body
+  class="min-h-screen bg-slate-100 dark:bg-[#111827] text-slate-800 dark:text-slate-100 transition-colors duration-150"
+  x-data="dashboard()"
+  x-init="init()"
+>
+
+<!-- ======================================================
+     AUTH SCREEN
+====================================================== -->
+<div x-show="!authenticated" x-cloak
+  class="fixed inset-0 flex items-center justify-center z-50 bg-slate-100 dark:bg-[#111827] p-4">
+
+  <div class="card w-full max-w-sm shadow-xl p-8">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="text-base font-semibold text-slate-900 dark:text-white leading-tight">LIS Dashboard</div>
+        <div class="text-xs text-slate-400">Log Ingestor Service</div>
+      </div>
+      <!-- Theme toggle on auth screen -->
+      <button @click="toggleTheme()" class="ml-auto p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+        <svg x-show="darkMode" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <svg x-show="!darkMode" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-widest">API Key</label>
+        <input
+          type="password"
+          x-model="authInput.key"
+          @keydown.enter="login()"
+          placeholder="lis_..."
+          class="w-full rounded-lg px-3.5 py-2.5 text-sm border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-300 dark:border-slate-600
+                 text-slate-900 dark:text-slate-100
+                 placeholder-slate-400 dark:placeholder-slate-500
+                 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+        />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-widest">
+          Default Tenant <span class="normal-case text-slate-400">(optional)</span>
+        </label>
+        <input
+          type="text"
+          x-model="authInput.tenantId"
+          @keydown.enter="login()"
+          placeholder="acme"
+          class="w-full rounded-lg px-3.5 py-2.5 text-sm border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-300 dark:border-slate-600
+                 text-slate-900 dark:text-slate-100
+                 placeholder-slate-400 dark:placeholder-slate-500
+                 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+        />
+      </div>
+
+      <div x-show="authError" x-cloak
+        class="text-xs rounded-lg px-3 py-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400"
+        x-text="authError">
+      </div>
+
+      <button @click="login()"
+        class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-colors text-sm shadow-sm shadow-indigo-500/30">
+        Sign in
+      </button>
+      <button @click="loginDev()"
+        class="w-full text-sm font-medium py-2.5 rounded-lg transition-colors border
+               text-slate-500 dark:text-slate-400
+               border-slate-200 dark:border-slate-700
+               hover:bg-slate-50 dark:hover:bg-slate-800
+               hover:text-slate-700 dark:hover:text-slate-200">
+        Dev mode (no auth)
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ======================================================
+     MAIN APP
+====================================================== -->
+<div x-show="authenticated" x-cloak class="flex flex-col min-h-screen">
+
+  <!-- ---- Header ---- -->
+  <header class="sticky top-0 z-40 border-b
+                 bg-white dark:bg-[#1a2035]
+                 border-slate-200 dark:border-[#2d3448]
+                 shadow-sm">
+    <div class="px-5 h-14 flex items-center gap-4">
+
+      <!-- Logo -->
+      <div class="flex items-center gap-2.5 shrink-0">
+        <div class="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <span class="text-sm font-semibold text-slate-900 dark:text-white hidden sm:block">LIS</span>
+      </div>
+
+      <div class="h-5 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+
+      <!-- Tenant -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-xs text-slate-400 hidden md:block">Tenant</span>
+        <input
+          type="text"
+          x-model="tenantId"
+          @change="onTenantChange()"
+          placeholder="all tenants"
+          class="rounded-md px-3 py-1.5 text-xs border outline-none transition-colors w-32
+                 bg-slate-50 dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 placeholder-slate-400
+                 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
+        />
+        <!-- Quick-fill pills from visible log data -->
+        <template x-for="tid in uniqueTenants" :key="tid">
+          <button
+            @click="tenantId = tid; onTenantChange()"
+            class="text-[10px] px-2 py-1 rounded-md border transition-colors
+                   border-slate-200 dark:border-slate-600
+                   bg-white dark:bg-slate-800
+                   text-slate-500 dark:text-slate-400
+                   hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+            x-text="tid"
+          ></button>
+        </template>
+      </div>
+
+      <!-- Time range -->
+      <select x-model="timeRange" @change="refresh()"
+        class="rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+               bg-slate-50 dark:bg-slate-800
+               border-slate-200 dark:border-slate-600
+               text-slate-700 dark:text-slate-200
+               focus:border-indigo-400">
+        <option value="1h">Last 1h</option>
+        <option value="6h">Last 6h</option>
+        <option value="24h">Last 24h</option>
+        <option value="7d">Last 7d</option>
+      </select>
+
+      <!-- Spacer -->
+      <div class="flex-1"></div>
+
+      <!-- Live badge -->
+      <button @click="toggleAutoRefresh()"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors"
+        :class="autoRefresh
+          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+          : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-600 hover:text-slate-600 dark:hover:text-slate-200'">
+        <span x-show="autoRefresh" class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span x-text="autoRefresh ? 'Live' : 'Paused'"></span>
+      </button>
+
+      <!-- Refresh -->
+      <button @click="refresh()" :disabled="loading"
+        class="px-3 py-1.5 rounded-md text-xs border transition-colors disabled:opacity-40
+               bg-slate-50 dark:bg-slate-800
+               border-slate-200 dark:border-slate-600
+               text-slate-500 dark:text-slate-400
+               hover:text-slate-700 dark:hover:text-slate-200
+               hover:border-slate-300 dark:hover:border-slate-500">
+        <svg x-show="!loading" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <svg x-show="loading" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </button>
+
+      <!-- Theme toggle -->
+      <button @click="toggleTheme()"
+        class="p-1.5 rounded-md border transition-colors
+               bg-slate-50 dark:bg-slate-800
+               border-slate-200 dark:border-slate-600
+               text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+        <svg x-show="darkMode" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <svg x-show="!darkMode" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
+      </button>
+
+      <!-- Logout -->
+      <button @click="logout()" class="text-xs text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors ml-1">
+        Logout
+      </button>
+    </div>
+  </header>
+
+  <!-- Error banner -->
+  <div x-show="globalError" x-cloak
+    class="px-5 py-2.5 text-xs border-b flex items-center justify-between
+           bg-red-50 dark:bg-red-950/30
+           border-red-200 dark:border-red-800/40
+           text-red-600 dark:text-red-400">
+    <span x-text="globalError"></span>
+    <button @click="globalError = null" class="ml-4 font-medium hover:underline">Dismiss</button>
+  </div>
+
+  <!-- ---- Content ---- -->
+  <main class="p-5 space-y-5 flex-1">
+
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <template x-for="card in statCards" :key="card.label">
+        <div class="card p-5 flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-widest" x-text="card.label"></span>
+            <div class="w-7 h-7 rounded-md flex items-center justify-center" :class="card.iconBg">
+              <span class="text-sm" x-text="card.icon"></span>
+            </div>
+          </div>
+          <div class="text-3xl font-bold stat-number leading-none" :class="card.color" x-text="card.value"></div>
+          <div class="text-xs text-slate-400 dark:text-slate-500" x-text="card.sub"></div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+      <!-- Timeline (2/3) -->
+      <div class="lg:col-span-2 card p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Events over time</h2>
+            <p class="text-xs text-slate-400 mt-0.5" x-text="tenantId ? 'Tenant: ' + tenantId : 'All tenants (set tenant for analytics)'"></p>
+          </div>
+          <div x-show="tenantId" class="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
+            <button
+              @click="timelineInterval = 'hour'; loadTimeline().catch(e => { globalError = e.message; })"
+              :disabled="loading"
+              class="text-xs px-3 py-1 rounded transition-colors disabled:opacity-40"
+              :class="timelineInterval === 'hour'
+                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'">
+              Hour
+            </button>
+            <button
+              @click="timelineInterval = 'day'; loadTimeline().catch(e => { globalError = e.message; })"
+              :disabled="loading"
+              class="text-xs px-3 py-1 rounded transition-colors disabled:opacity-40"
+              :class="timelineInterval === 'day'
+                ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'">
+              Day
+            </button>
+          </div>
+        </div>
+        <div class="relative h-52">
+          <canvas id="timelineChart"></canvas>
+          <div x-show="!tenantId"
+            class="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-slate-300 dark:text-slate-600">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <span class="text-sm font-medium">Enter a tenant to see the timeline</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Level breakdown (1/3) -->
+      <div class="card p-5 shadow-sm">
+        <div class="mb-4">
+          <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Level breakdown</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Distribution by severity</p>
+        </div>
+        <div class="relative h-52">
+          <canvas id="levelChart"></canvas>
+          <div x-show="!tenantId"
+            class="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-slate-300 dark:text-slate-600">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+            </svg>
+            <span class="text-sm font-medium">Set a tenant</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Sources -->
+    <div x-show="tenantId" class="card p-5 shadow-sm">
+      <div class="mb-4">
+        <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Top sources</h2>
+        <p class="text-xs text-slate-400 mt-0.5">Events by origin service</p>
+      </div>
+      <div class="relative h-40">
+        <canvas id="sourcesChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Log Stream -->
+    <div class="card shadow-sm overflow-hidden">
+
+      <!-- Filter bar -->
+      <div class="px-5 py-3.5 border-b border-slate-200 dark:border-[#2d3448] flex items-center gap-3 flex-wrap bg-slate-50 dark:bg-slate-800/40">
+        <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200 shrink-0">Log stream</h2>
+
+        <input type="text" x-model="filters.source" @input.debounce.400ms="filterLogs()" placeholder="Source..."
+          class="w-28 rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 placeholder-slate-400
+                 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20" />
+
+        <select x-model="filters.level" @change="filterLogs()"
+          class="rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 focus:border-indigo-400">
+          <option value="">All levels</option>
+          <option value="debug">debug</option>
+          <option value="info">info</option>
+          <option value="warn">warn</option>
+          <option value="error">error</option>
+          <option value="fatal">fatal</option>
+        </select>
+
+        <select x-model="filters.environment" @change="filterLogs()"
+          class="rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 focus:border-indigo-400">
+          <option value="">All envs</option>
+          <option value="dev">dev</option>
+          <option value="staging">staging</option>
+          <option value="prod">prod</option>
+        </select>
+
+        <input type="text" x-model="filters.q" @input.debounce.400ms="filterLogs()" placeholder="Search messages..."
+          class="flex-1 min-w-36 rounded-md px-3 py-1.5 text-xs border outline-none transition-colors
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-700 dark:text-slate-200
+                 placeholder-slate-400
+                 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20" />
+
+        <span x-show="total > 0" class="text-xs text-slate-400 ml-auto shrink-0 mono"
+          x-text="total.toLocaleString() + ' events'"></span>
+      </div>
+
+      <!-- Table: fixed height with its own scroll; thead is sticky inside the container -->
+      <div class="overflow-auto max-h-[560px]">
+        <table class="w-full text-xs">
+          <thead class="sticky top-0 z-10 bg-slate-50 dark:bg-[#1a2035] shadow-sm">
+            <tr class="border-b border-slate-200 dark:border-[#2d3448]">
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Time</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Level</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Tenant</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Source</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Env</th>
+              <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400 w-full">Message</th>
+            </tr>
+          </thead>
+
+          <!-- Loading state -->
+          <tbody x-show="loading && logs.length === 0">
+            <tr>
+              <td colspan="6" class="px-4 py-12 text-center text-slate-400 dark:text-slate-600">
+                <div class="flex items-center justify-center gap-2">
+                  <svg class="animate-spin w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Loading...
+                </div>
+              </td>
+            </tr>
+          </tbody>
+
+          <!-- Empty state -->
+          <tbody x-show="!loading && logs.length === 0">
+            <tr>
+              <td colspan="6" class="px-4 py-12 text-center text-slate-400 dark:text-slate-600">
+                No log events found for the selected filters
+              </td>
+            </tr>
+          </tbody>
+
+          <!--
+            Each x-for iteration MUST have a single root element.
+            <tbody> is used as the wrapper so we can have a main <tr>
+            and a detail <tr> per row without breaking Alpine or the table.
+            Multiple <tbody> elements in one <table> is valid HTML.
+          -->
+          <template x-for="log in logs" :key="log.id">
+            <tbody class="border-b border-slate-100 dark:border-[#2d3448]">
+
+              <!-- Main row -->
+              <tr
+                @click="toggleExpand(log)"
+                class="cursor-pointer transition-colors"
+                :class="selectedId === log.id
+                  ? 'bg-indigo-50 dark:bg-indigo-950/30'
+                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'"
+              >
+                <td class="px-4 py-2.5 whitespace-nowrap mono text-slate-400" x-text="fmtTime(log.occurred_at)"></td>
+                <td class="px-4 py-2.5">
+                  <span class="badge" :class="levelBadge(log.level)" x-text="log.level"></span>
+                </td>
+                <td class="px-4 py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap" x-text="log.tenant_id"></td>
+                <td class="px-4 py-2.5 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap" x-text="log.source"></td>
+                <td class="px-4 py-2.5 text-slate-400 whitespace-nowrap" x-text="log.environment"></td>
+                <td class="px-4 py-2.5 text-slate-700 dark:text-slate-200 max-w-xl">
+                  <span class="block truncate" x-text="log.message"></span>
+                </td>
+              </tr>
+
+              <!-- Expanded detail row -->
+              <tr x-show="selectedId === log.id" class="bg-indigo-50/60 dark:bg-indigo-950/20">
+                <td colspan="6" class="px-5 py-4">
+
+                  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
+                    <template x-for="[k, v] in detailFields(log)" :key="k">
+                      <div>
+                        <div class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1" x-text="k"></div>
+                        <div class="text-xs text-slate-700 dark:text-slate-300 mono break-all" x-text="v"></div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <template x-if="log.exception">
+                    <div class="mt-3">
+                      <div class="text-[10px] font-semibold text-red-500 uppercase tracking-widest mb-1.5">Exception</div>
+                      <pre class="rounded-lg px-4 py-3 text-[11px] overflow-x-auto leading-relaxed mono
+                                  bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40
+                                  text-red-700 dark:text-red-300"
+                           x-text="JSON.stringify(log.exception, null, 2)"></pre>
+                    </div>
+                  </template>
+
+                  <template x-if="log.properties">
+                    <div class="mt-3">
+                      <div class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Properties</div>
+                      <pre class="rounded-lg px-4 py-3 text-[11px] overflow-x-auto leading-relaxed mono
+                                  bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                                  text-slate-700 dark:text-slate-300"
+                           x-text="JSON.stringify(log.properties, null, 2)"></pre>
+                    </div>
+                  </template>
+                </td>
+              </tr>
+
+            </tbody>
+          </template>
+
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div x-show="total > limit"
+        class="px-5 py-3 border-t border-slate-200 dark:border-[#2d3448] flex items-center justify-between bg-slate-50 dark:bg-slate-800/20">
+        <button @click="prevPage()" :disabled="page === 1"
+          class="text-xs px-3 py-1.5 rounded-md border transition-colors disabled:opacity-30
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-500 dark:text-slate-400
+                 hover:text-slate-700 dark:hover:text-slate-200">
+          Previous
+        </button>
+        <span class="text-xs text-slate-400 mono" x-text="`Page ${page} of ${Math.ceil(total / limit)}`"></span>
+        <button @click="nextPage()" :disabled="page >= Math.ceil(total / limit)"
+          class="text-xs px-3 py-1.5 rounded-md border transition-colors disabled:opacity-30
+                 bg-white dark:bg-slate-800
+                 border-slate-200 dark:border-slate-600
+                 text-slate-500 dark:text-slate-400
+                 hover:text-slate-700 dark:hover:text-slate-200">
+          Next
+        </button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ======================================================
+     SCRIPT
+====================================================== -->
+<script>
+function dashboard() {
+  return {
+    darkMode: localStorage.getItem('lis_theme') !== 'light',
+
+    // Auth
+    authenticated: false,
+    authInput: { key: '', tenantId: '' },
+    authError: null,
+    apiKey: '',
+
+    // Filters / pagination
+    tenantId: '',
+    timeRange: '24h',
+    timelineInterval: 'hour',
+    filters: { level: '', source: '', environment: '', q: '' },
+    page: 1,
+    limit: 50,
+
+    // Data
+    logs: [],
+    total: 0,
+    selectedId: null,   // ID of the expanded row
+    selectedLog: null,  // full object for the expanded row detail panel
+    summary: null,
+
+    // Charts
+    _charts: {},
+
+    // UI state
+    loading: false,
+    globalError: null,
+    autoRefresh: true,
+    _timer: null,
+
+    // Unique tenant IDs visible in the current log page (drives quick-fill pills)
+    get uniqueTenants() {
+      if (this.tenantId) return [];
+      const seen = new Set();
+      const out = [];
+      for (const log of this.logs) {
+        if (log.tenant_id && !seen.has(log.tenant_id)) {
+          seen.add(log.tenant_id);
+          out.push(log.tenant_id);
+          if (out.length >= 6) break;
+        }
+      }
+      return out;
+    },
+
+    // ---- Stat cards ----
+    get statCards() {
+      const s = this.summary;
+      if (!s) {
+        return [
+          { label: 'Total events', value: '--', color: 'text-slate-700 dark:text-slate-200', sub: 'select a tenant', icon: '📊', iconBg: 'bg-slate-100 dark:bg-slate-700' },
+          { label: 'Errors', value: '--', color: 'text-red-500', sub: '', icon: '🔴', iconBg: 'bg-red-50 dark:bg-red-950/40' },
+          { label: 'Warnings', value: '--', color: 'text-amber-500', sub: '', icon: '🟡', iconBg: 'bg-amber-50 dark:bg-amber-950/40' },
+          { label: 'Matching', value: this.total > 0 ? this.total.toLocaleString() : '0', color: 'text-indigo-600 dark:text-indigo-400', sub: 'in table', icon: '🔍', iconBg: 'bg-indigo-50 dark:bg-indigo-950/40' },
+        ];
+      }
+      const bl = s.by_level || {};
+      const grand = Object.values(bl).reduce((a, b) => a + b, 0);
+      const errors = (bl.error || 0) + (bl.fatal || 0);
+      const warns = bl.warn || bl.warning || 0;
+      const errPct = grand > 0 ? ((errors / grand) * 100).toFixed(1) : '0';
+      return [
+        { label: 'Total events', value: grand.toLocaleString(), color: 'text-slate-800 dark:text-white', sub: 'in selected range', icon: '📊', iconBg: 'bg-slate-100 dark:bg-slate-700' },
+        { label: 'Errors + Fatal', value: errors.toLocaleString(), color: errors > 0 ? 'text-red-500' : 'text-slate-400', sub: errPct + '% error rate', icon: '🔴', iconBg: 'bg-red-50 dark:bg-red-950/40' },
+        { label: 'Warnings', value: warns.toLocaleString(), color: warns > 0 ? 'text-amber-500' : 'text-slate-400', sub: '', icon: '🟡', iconBg: 'bg-amber-50 dark:bg-amber-950/40' },
+        { label: 'Matching logs', value: this.total.toLocaleString(), color: 'text-indigo-600 dark:text-indigo-400', sub: 'in table', icon: '🔍', iconBg: 'bg-indigo-50 dark:bg-indigo-950/40' },
+      ];
+    },
+
+    // ---- Init ----
+    init() {
+      this._applyTheme();
+      const key = localStorage.getItem('lis_key');
+      if (key !== null) {
+        this.apiKey = key;
+        this.tenantId = localStorage.getItem('lis_tenant') || '';
+        this.authenticated = true;
+        this.$nextTick(() => this.refresh());
+      }
+      // Save tenant on every change so page reload always restores the last
+      // used tenant, regardless of whether the input blur event ever fired.
+      this.$watch('tenantId', v => localStorage.setItem('lis_tenant', v));
+    },
+
+    toggleTheme() {
+      this.darkMode = !this.darkMode;
+      localStorage.setItem('lis_theme', this.darkMode ? 'dark' : 'light');
+      this._applyTheme();
+      // Redraw charts with updated color scheme
+      if (this.tenantId && this.summary) {
+        this.$nextTick(() => {
+          this._renderLevel(this.summary.by_level || {});
+        });
+        this.loadTimeline().catch(() => {});
+        this._fetch('/v1/analytics/top-sources', {
+          tenant_id: this.tenantId,
+          n: 8,
+          ...this._timeWindow(),
+        }).then(sources => this.$nextTick(() => this._renderSources(sources))).catch(() => {});
+      }
+    },
+
+    _applyTheme() {
+      document.documentElement.classList.toggle('dark', this.darkMode);
+    },
+
+    // ---- Auth ----
+    login() {
+      this.authError = null;
+      this.apiKey = this.authInput.key.trim();
+      this.tenantId = this.authInput.tenantId.trim();
+      localStorage.setItem('lis_key', this.apiKey);
+      localStorage.setItem('lis_tenant', this.tenantId);
+      this.authenticated = true;
+      this.$nextTick(() => this.refresh());
+    },
+
+    loginDev() {
+      this.authInput.key = '';
+      this.login();
+    },
+
+    logout() {
+      clearInterval(this._timer);
+      localStorage.removeItem('lis_key');
+      localStorage.removeItem('lis_tenant');
+      this.authenticated = false;
+      this.apiKey = '';
+      this.logs = [];
+      this.summary = null;
+      this._destroyCharts();
+    },
+
+    onTenantChange() {
+      localStorage.setItem('lis_tenant', this.tenantId);
+      this.page = 1;
+      this.refresh();
+    },
+
+    // ---- Auto refresh ----
+    toggleAutoRefresh() {
+      this.autoRefresh = !this.autoRefresh;
+      if (this.autoRefresh) this._startTimer();
+      else clearInterval(this._timer);
+    },
+
+    _startTimer() {
+      clearInterval(this._timer);
+      this._timer = setInterval(() => this.refresh(), 15000);
+    },
+
+    // ---- API ----
+    _headers() {
+      const h = { 'Content-Type': 'application/json' };
+      if (this.apiKey) h['Authorization'] = `Bearer ${this.apiKey}`;
+      return h;
+    },
+
+    _timeWindow() {
+      const now = new Date();
+      const map = { '1h': 1, '6h': 6, '24h': 24, '7d': 168 };
+      const hrs = map[this.timeRange] || 24;
+      return {
+        from_dt: new Date(now.getTime() - hrs * 3_600_000).toISOString(),
+        to_dt: now.toISOString(),
+      };
+    },
+
+    async _fetch(path, params = {}) {
+      const url = new URL(path, window.location.origin);
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== '' && v !== null && v !== undefined) url.searchParams.set(k, String(v));
+      }
+      const resp = await fetch(url.toString(), { headers: this._headers() });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body.detail || `HTTP ${resp.status}`);
+      }
+      return resp.json();
+    },
+
+    // ---- Data loading ----
+    async refresh() {
+      if (this.loading) return;
+      this.loading = true;
+      this.globalError = null;
+      try {
+        await Promise.all([this.loadLogs(), this.loadAnalytics()]);
+        if (this.autoRefresh) this._startTimer();
+      } catch (e) {
+        this.globalError = e.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async loadLogs() {
+      const tw = this._timeWindow();
+      const data = await this._fetch('/v1/logs', {
+        tenant_id: this.tenantId || undefined,
+        level: this.filters.level,
+        source: this.filters.source,
+        environment: this.filters.environment,
+        q: this.filters.q,
+        from_dt: tw.from_dt,
+        to_dt: tw.to_dt,
+        page: this.page,
+        limit: this.limit,
+      });
+      this.logs = data.items;
+      this.total = data.total;
+    },
+
+    async loadAnalytics() {
+      if (!this.tenantId) {
+        this.summary = null;
+        this._destroyCharts();
+        return;
+      }
+      const tw = this._timeWindow();
+      const [summary, sources] = await Promise.all([
+        this._fetch('/v1/analytics/summary', { tenant_id: this.tenantId, ...tw }),
+        this._fetch('/v1/analytics/top-sources', { tenant_id: this.tenantId, n: 8, ...tw }),
+      ]);
+      this.summary = summary;
+      this.$nextTick(() => {
+        this._renderLevel(summary.by_level || {});
+        this._renderSources(sources);
+      });
+      await this.loadTimeline();
+    },
+
+    async loadTimeline() {
+      if (!this.tenantId) return;
+      const tw = this._timeWindow();
+      const buckets = await this._fetch('/v1/analytics/timeline', {
+        tenant_id: this.tenantId,
+        interval: this.timelineInterval,
+        ...tw,
+      });
+      this.$nextTick(() => this._renderTimeline(buckets));
+    },
+
+    filterLogs() {
+      this.page = 1;
+      this.loadLogs().catch(e => { this.globalError = e.message; });
+    },
+
+    // Expand / collapse a log row. Uses a string ID so comparison is always
+    // simple equality, avoids object-reference issues in Alpine x-for.
+    toggleExpand(log) {
+      if (this.selectedId === log.id) {
+        this.selectedId = null;
+        this.selectedLog = null;
+      } else {
+        this.selectedId = log.id;
+        this.selectedLog = log;
+      }
+    },
+
+    prevPage() {
+      if (this.page > 1) { this.page--; this.loadLogs().catch(e => { this.globalError = e.message; }); }
+    },
+
+    nextPage() {
+      if (this.page < Math.ceil(this.total / this.limit)) {
+        this.page++;
+        this.loadLogs().catch(e => { this.globalError = e.message; });
+      }
+    },
+
+    // ---- Charts ----
+    _chartDefaults() {
+      const dark = this.darkMode;
+      return {
+        textColor: dark ? '#94a3b8' : '#64748b',
+        gridColor: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
+      };
+    },
+
+    _destroyCharts() {
+      for (const c of Object.values(this._charts)) c?.destroy();
+      this._charts = {};
+    },
+
+    _renderTimeline(buckets) {
+      const ctx = document.getElementById('timelineChart');
+      if (!ctx) return;
+      const { textColor, gridColor } = this._chartDefaults();
+      const dark = this.darkMode;
+      const labels = buckets.map(b => this._fmtBucket(b.bucket));
+      const data   = buckets.map(b => b.count);
+      const fillBg = dark ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.08)';
+
+      if (this._charts.timeline) {
+        const ch = this._charts.timeline;
+        ch.data.labels = labels;
+        ch.data.datasets[0].data = data;
+        ch.data.datasets[0].backgroundColor = fillBg;
+        ch.data.datasets[0].pointRadius = buckets.length < 30 ? 3 : 0;
+        ch.options.scales.x.grid.color = gridColor;
+        ch.options.scales.x.ticks.color = textColor;
+        ch.options.scales.y.grid.color = gridColor;
+        ch.options.scales.y.ticks.color = textColor;
+        ch.options.plugins.tooltip.backgroundColor = dark ? '#1e2433' : '#ffffff';
+        ch.options.plugins.tooltip.titleColor = textColor;
+        ch.options.plugins.tooltip.bodyColor = dark ? '#e2e8f0' : '#1e293b';
+        ch.options.plugins.tooltip.borderColor = dark ? '#2d3448' : '#e2e8f0';
+        ch.update('none');
+        return;
+      }
+
+      this._charts.timeline = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Events',
+            data,
+            borderColor: '#6366f1',
+            backgroundColor: fillBg,
+            fill: true,
+            tension: 0.35,
+            pointRadius: buckets.length < 30 ? 3 : 0,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#6366f1',
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: dark ? '#1e2433' : '#ffffff',
+              titleColor: textColor,
+              bodyColor: dark ? '#e2e8f0' : '#1e293b',
+              borderColor: dark ? '#2d3448' : '#e2e8f0',
+              borderWidth: 1,
+              padding: 10,
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: gridColor },
+              ticks: { color: textColor, maxTicksLimit: 10, font: { size: 11 } },
+            },
+            y: {
+              grid: { color: gridColor },
+              ticks: { color: textColor, precision: 0, font: { size: 11 } },
+              beginAtZero: true,
+            },
+          },
+        },
+      });
+    },
+
+    _renderLevel(byLevel) {
+      const PALETTE = {
+        debug:   '#94a3b8',
+        info:    '#6366f1',
+        warn:    '#f59e0b',
+        warning: '#f59e0b',
+        error:   '#ef4444',
+        fatal:   '#7c3aed',
+      };
+      const labels = Object.keys(byLevel).filter(k => byLevel[k] > 0);
+      if (!labels.length) {
+        this._charts.level?.destroy();
+        this._charts.level = null;
+        return;
+      }
+      const ctx = document.getElementById('levelChart');
+      if (!ctx) return;
+      const { textColor } = this._chartDefaults();
+      const dark = this.darkMode;
+      const data = labels.map(l => byLevel[l]);
+      const bg   = labels.map(l => PALETTE[l] || '#64748b');
+
+      if (this._charts.level) {
+        const ch = this._charts.level;
+        ch.data.labels = labels;
+        ch.data.datasets[0].data = data;
+        ch.data.datasets[0].backgroundColor = bg;
+        ch.options.plugins.legend.labels.color = textColor;
+        ch.options.plugins.tooltip.backgroundColor = dark ? '#1e2433' : '#ffffff';
+        ch.options.plugins.tooltip.titleColor = textColor;
+        ch.options.plugins.tooltip.bodyColor = dark ? '#e2e8f0' : '#1e293b';
+        ch.options.plugins.tooltip.borderColor = dark ? '#2d3448' : '#e2e8f0';
+        ch.update('none');
+        return;
+      }
+
+      this._charts.level = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: bg,
+            borderWidth: 0,
+            hoverOffset: 5,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { color: textColor, boxWidth: 10, padding: 14, font: { size: 11 } },
+            },
+            tooltip: {
+              backgroundColor: dark ? '#1e2433' : '#ffffff',
+              titleColor: textColor,
+              bodyColor: dark ? '#e2e8f0' : '#1e293b',
+              borderColor: dark ? '#2d3448' : '#e2e8f0',
+              borderWidth: 1,
+              padding: 10,
+            },
+          },
+        },
+      });
+    },
+
+    _renderSources(sources) {
+      if (!sources.length) {
+        this._charts.sources?.destroy();
+        this._charts.sources = null;
+        return;
+      }
+      const ctx = document.getElementById('sourcesChart');
+      if (!ctx) return;
+      const { textColor, gridColor } = this._chartDefaults();
+      const dark = this.darkMode;
+      const labels = sources.map(s => s.source);
+      const data   = sources.map(s => s.count);
+      const barBg  = dark ? 'rgba(99,102,241,0.7)' : 'rgba(99,102,241,0.85)';
+
+      if (this._charts.sources) {
+        const ch = this._charts.sources;
+        ch.data.labels = labels;
+        ch.data.datasets[0].data = data;
+        ch.data.datasets[0].backgroundColor = barBg;
+        ch.options.scales.x.grid.color = gridColor;
+        ch.options.scales.x.ticks.color = textColor;
+        ch.options.scales.y.ticks.color = textColor;
+        ch.options.plugins.tooltip.backgroundColor = dark ? '#1e2433' : '#ffffff';
+        ch.options.plugins.tooltip.titleColor = textColor;
+        ch.options.plugins.tooltip.bodyColor = dark ? '#e2e8f0' : '#1e293b';
+        ch.options.plugins.tooltip.borderColor = dark ? '#2d3448' : '#e2e8f0';
+        ch.update('none');
+        return;
+      }
+
+      this._charts.sources = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Events',
+            data,
+            backgroundColor: barBg,
+            hoverBackgroundColor: '#6366f1',
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: dark ? '#1e2433' : '#ffffff',
+              titleColor: textColor,
+              bodyColor: dark ? '#e2e8f0' : '#1e293b',
+              borderColor: dark ? '#2d3448' : '#e2e8f0',
+              borderWidth: 1,
+              padding: 10,
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: gridColor },
+              ticks: { color: textColor, precision: 0, font: { size: 11 } },
+              beginAtZero: true,
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: textColor, font: { size: 11 } },
+            },
+          },
+        },
+      });
+    },
+
+    // ---- Formatters ----
+    fmtTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        + ' ' + d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    },
+
+    _fmtBucket(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return this.timelineInterval === 'day'
+        ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+        : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    },
+
+    levelBadge(level) {
+      return {
+        debug:   'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+        info:    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300',
+        warn:    'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
+        warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
+        error:   'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+        fatal:   'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300',
+      }[level] || 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
+    },
+
+    detailFields(log) {
+      return [
+        ['ID', log.id],
+        ['Trace ID', log.trace_id],
+        ['Span ID', log.span_id],
+        ['Correlation', log.correlation_id],
+        ['Request ID', log.request_id],
+        ['User ID', log.user_id],
+        ['Path', log.path],
+        ['Method', log.method],
+        ['Status', log.status_code],
+        ['Duration', log.duration_ms != null ? log.duration_ms + 'ms' : null],
+        ['Type', log.type],
+        ['Occurred', log.occurred_at],
+      ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+    },
+  };
+}
+</script>
+</body>
+</html>

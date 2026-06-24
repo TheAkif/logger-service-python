@@ -236,7 +236,7 @@ class SteadyMixUser(HttpUser):
 
     @task(1)
     def batcher_stats(self):
-        self.client.get("/internal/batcher", name="GET /internal/batcher")
+        self.client.get("/internal/health", name="GET /internal/health")
 
 
 # ── Load shape ────────────────────────────────────────────────────────────────
