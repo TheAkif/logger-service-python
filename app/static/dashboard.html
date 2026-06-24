@@ -647,6 +647,9 @@ function dashboard() {
         this.authenticated = true;
         this.$nextTick(() => this.refresh());
       }
+      // Save tenant on every change so page reload always restores the last
+      // used tenant, regardless of whether the input blur event ever fired.
+      this.$watch('tenantId', v => localStorage.setItem('lis_tenant', v));
     },
 
     toggleTheme() {
@@ -853,17 +856,39 @@ function dashboard() {
     _renderTimeline(buckets) {
       const ctx = document.getElementById('timelineChart');
       if (!ctx) return;
-      this._charts.timeline?.destroy();
       const { textColor, gridColor } = this._chartDefaults();
+      const dark = this.darkMode;
+      const labels = buckets.map(b => this._fmtBucket(b.bucket));
+      const data   = buckets.map(b => b.count);
+      const fillBg = dark ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.08)';
+
+      if (this._charts.timeline) {
+        const ch = this._charts.timeline;
+        ch.data.labels = labels;
+        ch.data.datasets[0].data = data;
+        ch.data.datasets[0].backgroundColor = fillBg;
+        ch.data.datasets[0].pointRadius = buckets.length < 30 ? 3 : 0;
+        ch.options.scales.x.grid.color = gridColor;
+        ch.options.scales.x.ticks.color = textColor;
+        ch.options.scales.y.grid.color = gridColor;
+        ch.options.scales.y.ticks.color = textColor;
+        ch.options.plugins.tooltip.backgroundColor = dark ? '#1e2433' : '#ffffff';
+        ch.options.plugins.tooltip.titleColor = textColor;
+        ch.options.plugins.tooltip.bodyColor = dark ? '#e2e8f0' : '#1e293b';
+        ch.options.plugins.tooltip.borderColor = dark ? '#2d3448' : '#e2e8f0';
+        ch.update('none');
+        return;
+      }
+
       this._charts.timeline = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: buckets.map(b => this._fmtBucket(b.bucket)),
+          labels,
           datasets: [{
             label: 'Events',
-            data: buckets.map(b => b.count),
+            data,
             borderColor: '#6366f1',
-            backgroundColor: this.darkMode ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.08)',
+            backgroundColor: fillBg,
             fill: true,
             tension: 0.35,
             pointRadius: buckets.length < 30 ? 3 : 0,
@@ -879,10 +904,10 @@ function dashboard() {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: this.darkMode ? '#1e2433' : '#ffffff',
+              backgroundColor: dark ? '#1e2433' : '#ffffff',
               titleColor: textColor,
-              bodyColor: this.darkMode ? '#e2e8f0' : '#1e293b',
-              borderColor: this.darkMode ? '#2d3448' : '#e2e8f0',
+              bodyColor: dark ? '#e2e8f0' : '#1e293b',
+              borderColor: dark ? '#2d3448' : '#e2e8f0',
               borderWidth: 1,
               padding: 10,
             },
@@ -903,9 +928,6 @@ function dashboard() {
     },
 
     _renderLevel(byLevel) {
-      const ctx = document.getElementById('levelChart');
-      if (!ctx) return;
-      this._charts.level?.destroy();
       const PALETTE = {
         debug:   '#94a3b8',
         info:    '#6366f1',
@@ -915,15 +937,39 @@ function dashboard() {
         fatal:   '#7c3aed',
       };
       const labels = Object.keys(byLevel).filter(k => byLevel[k] > 0);
-      if (!labels.length) return;
+      if (!labels.length) {
+        this._charts.level?.destroy();
+        this._charts.level = null;
+        return;
+      }
+      const ctx = document.getElementById('levelChart');
+      if (!ctx) return;
       const { textColor } = this._chartDefaults();
+      const dark = this.darkMode;
+      const data = labels.map(l => byLevel[l]);
+      const bg   = labels.map(l => PALETTE[l] || '#64748b');
+
+      if (this._charts.level) {
+        const ch = this._charts.level;
+        ch.data.labels = labels;
+        ch.data.datasets[0].data = data;
+        ch.data.datasets[0].backgroundColor = bg;
+        ch.options.plugins.legend.labels.color = textColor;
+        ch.options.plugins.tooltip.backgroundColor = dark ? '#1e2433' : '#ffffff';
+        ch.options.plugins.tooltip.titleColor = textColor;
+        ch.options.plugins.tooltip.bodyColor = dark ? '#e2e8f0' : '#1e293b';
+        ch.options.plugins.tooltip.borderColor = dark ? '#2d3448' : '#e2e8f0';
+        ch.update('none');
+        return;
+      }
+
       this._charts.level = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels,
           datasets: [{
-            data: labels.map(l => byLevel[l]),
-            backgroundColor: labels.map(l => PALETTE[l] || '#64748b'),
+            data,
+            backgroundColor: bg,
             borderWidth: 0,
             hoverOffset: 5,
           }],
@@ -938,10 +984,10 @@ function dashboard() {
               labels: { color: textColor, boxWidth: 10, padding: 14, font: { size: 11 } },
             },
             tooltip: {
-              backgroundColor: this.darkMode ? '#1e2433' : '#ffffff',
+              backgroundColor: dark ? '#1e2433' : '#ffffff',
               titleColor: textColor,
-              bodyColor: this.darkMode ? '#e2e8f0' : '#1e293b',
-              borderColor: this.darkMode ? '#2d3448' : '#e2e8f0',
+              bodyColor: dark ? '#e2e8f0' : '#1e293b',
+              borderColor: dark ? '#2d3448' : '#e2e8f0',
               borderWidth: 1,
               padding: 10,
             },
@@ -951,19 +997,43 @@ function dashboard() {
     },
 
     _renderSources(sources) {
+      if (!sources.length) {
+        this._charts.sources?.destroy();
+        this._charts.sources = null;
+        return;
+      }
       const ctx = document.getElementById('sourcesChart');
       if (!ctx) return;
-      this._charts.sources?.destroy();
-      if (!sources.length) return;
       const { textColor, gridColor } = this._chartDefaults();
+      const dark = this.darkMode;
+      const labels = sources.map(s => s.source);
+      const data   = sources.map(s => s.count);
+      const barBg  = dark ? 'rgba(99,102,241,0.7)' : 'rgba(99,102,241,0.85)';
+
+      if (this._charts.sources) {
+        const ch = this._charts.sources;
+        ch.data.labels = labels;
+        ch.data.datasets[0].data = data;
+        ch.data.datasets[0].backgroundColor = barBg;
+        ch.options.scales.x.grid.color = gridColor;
+        ch.options.scales.x.ticks.color = textColor;
+        ch.options.scales.y.ticks.color = textColor;
+        ch.options.plugins.tooltip.backgroundColor = dark ? '#1e2433' : '#ffffff';
+        ch.options.plugins.tooltip.titleColor = textColor;
+        ch.options.plugins.tooltip.bodyColor = dark ? '#e2e8f0' : '#1e293b';
+        ch.options.plugins.tooltip.borderColor = dark ? '#2d3448' : '#e2e8f0';
+        ch.update('none');
+        return;
+      }
+
       this._charts.sources = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: sources.map(s => s.source),
+          labels,
           datasets: [{
             label: 'Events',
-            data: sources.map(s => s.count),
-            backgroundColor: this.darkMode ? 'rgba(99,102,241,0.7)' : 'rgba(99,102,241,0.85)',
+            data,
+            backgroundColor: barBg,
             hoverBackgroundColor: '#6366f1',
             borderRadius: 4,
           }],
@@ -975,10 +1045,10 @@ function dashboard() {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: this.darkMode ? '#1e2433' : '#ffffff',
+              backgroundColor: dark ? '#1e2433' : '#ffffff',
               titleColor: textColor,
-              bodyColor: this.darkMode ? '#e2e8f0' : '#1e293b',
-              borderColor: this.darkMode ? '#2d3448' : '#e2e8f0',
+              bodyColor: dark ? '#e2e8f0' : '#1e293b',
+              borderColor: dark ? '#2d3448' : '#e2e8f0',
               borderWidth: 1,
               padding: 10,
             },
