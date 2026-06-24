@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 import asyncpg
@@ -19,6 +20,15 @@ _MAX_RETRIES = 5
 _RETRY_BASE_SEC = 2.0
 
 
+async def _init_conn(conn: asyncpg.Connection) -> None:
+    await conn.set_type_codec(
+        "jsonb",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
+    )
+
+
 async def connect() -> None:
     global pool
     for attempt in range(1, _MAX_RETRIES + 1):
@@ -29,6 +39,7 @@ async def connect() -> None:
                 max_size=DB_POOL_MAX,
                 max_inactive_connection_lifetime=60,
                 command_timeout=DB_COMMAND_TIMEOUT,
+                init=_init_conn,
             )
             logger.info("db_connected", extra={"attempt": attempt})
             return

@@ -13,9 +13,11 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .logging_config import setup_logging
 from .models import BatchIngestResponse, LogEvent, LogQueryResponse, LogRecord
-from .security import require_token
+from .security import ApiKeyRecord, require_token, require_read
 from .settings import ENV, INGEST_TOKEN
+from . import admin as admin_module
 from . import analytics, db, query as query_module
+from . import ratelimit
 from .batcher import Batcher
 
 setup_logging()
@@ -49,9 +51,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="LIS Log Ingestor", lifespan=lifespan)
+app.include_router(admin_module.router)
 
 
-# ── Liveness / readiness ──────────────────────────────────────────────────────
+# ---- Liveness / readiness ---------------------------------------------------
 
 @app.get("/health", tags=["internal"])
 async def health():
@@ -67,16 +70,41 @@ async def ready():
         raise HTTPException(status_code=503, detail="db not ready")
 
 
-# ── Ingest ────────────────────────────────────────────────────────────────────
+# ---- Ingest -----------------------------------------------------------------
+
+def _check_rate_limit(key: ApiKeyRecord, pool):
+    async def _inner():
+        tenant_id = key.tenant_id
+        if tenant_id in ("__legacy__", "__dev__"):
+            return
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT config FROM tenants WHERE id = $1 AND deleted_at IS NULL", tenant_id
+            )
+        if row is None:
+            return
+        limit = row["config"].get("rate_limit_per_min")
+        if not ratelimit.check_rate_limit(tenant_id, limit):
+            raise HTTPException(
+                status_code=429,
+                detail="rate limit exceeded",
+                headers={"Retry-After": "60"},
+            )
+    return _inner
+
 
 @app.post(
     "/v1/logs",
     status_code=202,
-    dependencies=[Depends(require_token)],
     tags=["ingest"],
     summary="Ingest a single log event",
 )
-async def post_log(e: LogEvent):
+async def post_log(
+    e: LogEvent,
+    key: ApiKeyRecord = Depends(require_token),
+):
+    pool = db.get_pool()
+    await _check_rate_limit(key, pool)()
     ok = batcher.enqueue_nowait(e)
     if not ok:
         logger.warning("ingest_rejected", extra={"reason": "queue_full"})
@@ -88,13 +116,18 @@ async def post_log(e: LogEvent):
     "/v1/logs/batch",
     status_code=202,
     response_model=BatchIngestResponse,
-    dependencies=[Depends(require_token)],
     tags=["ingest"],
     summary="Ingest multiple log events",
 )
-async def post_logs_batch(events: List[LogEvent]):
+async def post_logs_batch(
+    events: List[LogEvent],
+    key: ApiKeyRecord = Depends(require_token),
+):
     if len(events) > 500:
         raise HTTPException(status_code=413, detail="batch too large (max 500)")
+
+    pool = db.get_pool()
+    await _check_rate_limit(key, pool)()
 
     for e in events:
         if not batcher.enqueue_nowait(e):
@@ -104,16 +137,16 @@ async def post_logs_batch(events: List[LogEvent]):
     return BatchIngestResponse(count=len(events))
 
 
-# ── Query ─────────────────────────────────────────────────────────────────────
+# ---- Query ------------------------------------------------------------------
 
 @app.get(
     "/v1/logs",
     response_model=LogQueryResponse,
-    dependencies=[Depends(require_token)],
     tags=["query"],
     summary="Query log events with optional filters",
 )
 async def get_logs(
+    key: ApiKeyRecord = Depends(require_read),
     tenant_id: Optional[str] = None,
     source: Optional[str] = None,
     level: Optional[str] = None,
@@ -154,11 +187,13 @@ async def get_logs(
 @app.get(
     "/v1/logs/{log_id}",
     response_model=LogRecord,
-    dependencies=[Depends(require_token)],
     tags=["query"],
     summary="Get a single log event by ID",
 )
-async def get_log(log_id: UUID):
+async def get_log(
+    log_id: UUID,
+    key: ApiKeyRecord = Depends(require_read),
+):
     pool = db.get_pool()
     row = await query_module.get_log_by_id(pool, log_id)
     if row is None:
@@ -166,16 +201,16 @@ async def get_log(log_id: UUID):
     return LogRecord.model_validate(row)
 
 
-# ── Analytics ─────────────────────────────────────────────────────────────────
+# ---- Analytics --------------------------------------------------------------
 
 @app.get(
     "/v1/analytics/summary",
-    dependencies=[Depends(require_token)],
     tags=["analytics"],
     summary="Event counts grouped by level, type, and source",
 )
 async def analytics_summary(
     tenant_id: str,
+    key: ApiKeyRecord = Depends(require_read),
     from_dt: Optional[datetime] = None,
     to_dt: Optional[datetime] = None,
 ):
@@ -185,12 +220,12 @@ async def analytics_summary(
 
 @app.get(
     "/v1/analytics/timeline",
-    dependencies=[Depends(require_token)],
     tags=["analytics"],
     summary="Event count per hour or day for a time window",
 )
 async def analytics_timeline(
     tenant_id: str,
+    key: ApiKeyRecord = Depends(require_read),
     interval: str = Query("hour", pattern="^(hour|day)$"),
     from_dt: Optional[datetime] = None,
     to_dt: Optional[datetime] = None,
@@ -201,12 +236,12 @@ async def analytics_timeline(
 
 @app.get(
     "/v1/analytics/top-sources",
-    dependencies=[Depends(require_token)],
     tags=["analytics"],
     summary="Top N sources by event count",
 )
 async def analytics_top_sources(
     tenant_id: str,
+    key: ApiKeyRecord = Depends(require_read),
     n: int = Query(10, ge=1, le=50),
     from_dt: Optional[datetime] = None,
     to_dt: Optional[datetime] = None,
@@ -217,16 +252,18 @@ async def analytics_top_sources(
 
 @app.get(
     "/v1/analytics/error-rate",
-    dependencies=[Depends(require_token)],
     tags=["analytics"],
     summary="Error and fatal rate per hour over the last 24 hours",
 )
-async def analytics_error_rate(tenant_id: str):
+async def analytics_error_rate(
+    tenant_id: str,
+    key: ApiKeyRecord = Depends(require_read),
+):
     pool = db.get_pool()
     return await analytics.get_error_rate(pool, tenant_id)
 
 
-# ── Internal ──────────────────────────────────────────────────────────────────
+# ---- Internal ---------------------------------------------------------------
 
 @app.get("/internal/health", tags=["internal"])
 async def internal_health():

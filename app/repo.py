@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from typing import List
 
@@ -17,7 +16,7 @@ VALUES (
   $1,$2,$3,$4,$5,$6,$7,
   $8,$9,$10,$11,
   $12,$13,$14,$15,$16,
-  $17::jsonb,$18::jsonb
+  $17,$18
 )
 """
 
@@ -26,18 +25,9 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _to_jsonb(value):
-    if value is None:
-        return None
-    # asyncpg accepts JSONB as a string
-    return json.dumps(value, ensure_ascii=False)
-
-
 async def insert_one(e: LogEvent) -> None:
     pool = db.get_pool()
-
     occurred_at = e.occurredAt or _utc_now()
-
     async with pool.acquire() as conn:
         await conn.execute(
             _INSERT_SQL,
@@ -45,8 +35,7 @@ async def insert_one(e: LogEvent) -> None:
             e.tenantId, e.source, e.environment, e.level, e.type, e.message,
             e.traceId, e.spanId, e.correlationId, e.requestId,
             e.userId, e.path, e.method, e.statusCode, e.durationMs,
-            _to_jsonb(e.exception),
-            _to_jsonb(e.properties),
+            e.exception, e.properties,
         )
 
 
@@ -65,8 +54,7 @@ async def insert_batch(events: List[LogEvent]) -> None:
             e.tenantId, e.source, e.environment, e.level, e.type, e.message,
             e.traceId, e.spanId, e.correlationId, e.requestId,
             e.userId, e.path, e.method, e.statusCode, e.durationMs,
-            _to_jsonb(e.exception),
-            _to_jsonb(e.properties),
+            e.exception, e.properties,
         ))
 
     async with pool.acquire() as conn:
