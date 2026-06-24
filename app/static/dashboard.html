@@ -178,7 +178,7 @@
       <div class="h-5 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
 
       <!-- Tenant -->
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <span class="text-xs text-slate-400 hidden md:block">Tenant</span>
         <input
           type="text"
@@ -192,6 +192,18 @@
                  placeholder-slate-400
                  focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
         />
+        <!-- Quick-fill pills from visible log data -->
+        <template x-for="tid in uniqueTenants" :key="tid">
+          <button
+            @click="tenantId = tid; onTenantChange()"
+            class="text-[10px] px-2 py-1 rounded-md border transition-colors
+                   border-slate-200 dark:border-slate-600
+                   bg-white dark:bg-slate-800
+                   text-slate-500 dark:text-slate-400
+                   hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+            x-text="tid"
+          ></button>
+        </template>
       </div>
 
       <!-- Time range -->
@@ -298,15 +310,19 @@
             <p class="text-xs text-slate-400 mt-0.5" x-text="tenantId ? 'Tenant: ' + tenantId : 'All tenants (set tenant for analytics)'"></p>
           </div>
           <div x-show="tenantId" class="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
-            <button @click="timelineInterval = 'hour'; loadTimeline()"
-              class="text-xs px-3 py-1 rounded transition-colors"
+            <button
+              @click="timelineInterval = 'hour'; loadTimeline().catch(e => { globalError = e.message; })"
+              :disabled="loading"
+              class="text-xs px-3 py-1 rounded transition-colors disabled:opacity-40"
               :class="timelineInterval === 'hour'
                 ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'">
               Hour
             </button>
-            <button @click="timelineInterval = 'day'; loadTimeline()"
-              class="text-xs px-3 py-1 rounded transition-colors"
+            <button
+              @click="timelineInterval = 'day'; loadTimeline().catch(e => { globalError = e.message; })"
+              :disabled="loading"
+              class="text-xs px-3 py-1 rounded transition-colors disabled:opacity-40"
               :class="timelineInterval === 'day'
                 ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'">
@@ -410,11 +426,11 @@
           x-text="total.toLocaleString() + ' events'"></span>
       </div>
 
-      <!-- Table -->
-      <div class="overflow-x-auto">
+      <!-- Table: fixed height with its own scroll; thead is sticky inside the container -->
+      <div class="overflow-auto max-h-[560px]">
         <table class="w-full text-xs">
-          <thead>
-            <tr class="border-b border-slate-200 dark:border-[#2d3448] bg-slate-50 dark:bg-slate-800/30">
+          <thead class="sticky top-0 z-10 bg-slate-50 dark:bg-[#1a2035] shadow-sm">
+            <tr class="border-b border-slate-200 dark:border-[#2d3448]">
               <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Time</th>
               <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Level</th>
               <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Tenant</th>
@@ -423,9 +439,10 @@
               <th class="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400 w-full">Message</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100 dark:divide-[#2d3448]">
 
-            <tr x-show="loading && logs.length === 0">
+          <!-- Loading state -->
+          <tbody x-show="loading && logs.length === 0">
+            <tr>
               <td colspan="6" class="px-4 py-12 text-center text-slate-400 dark:text-slate-600">
                 <div class="flex items-center justify-center gap-2">
                   <svg class="animate-spin w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24">
@@ -436,19 +453,34 @@
                 </div>
               </td>
             </tr>
+          </tbody>
 
-            <tr x-show="!loading && logs.length === 0">
+          <!-- Empty state -->
+          <tbody x-show="!loading && logs.length === 0">
+            <tr>
               <td colspan="6" class="px-4 py-12 text-center text-slate-400 dark:text-slate-600">
                 No log events found for the selected filters
               </td>
             </tr>
+          </tbody>
 
-            <template x-for="log in logs" :key="log.id">
-              <tr @click="selectedLog = selectedLog?.id === log.id ? null : log"
+          <!--
+            Each x-for iteration MUST have a single root element.
+            <tbody> is used as the wrapper so we can have a main <tr>
+            and a detail <tr> per row without breaking Alpine or the table.
+            Multiple <tbody> elements in one <table> is valid HTML.
+          -->
+          <template x-for="log in logs" :key="log.id">
+            <tbody class="border-b border-slate-100 dark:border-[#2d3448]">
+
+              <!-- Main row -->
+              <tr
+                @click="toggleExpand(log)"
                 class="cursor-pointer transition-colors"
-                :class="selectedLog?.id === log.id
+                :class="selectedId === log.id
                   ? 'bg-indigo-50 dark:bg-indigo-950/30'
-                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'">
+                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'"
+              >
                 <td class="px-4 py-2.5 whitespace-nowrap mono text-slate-400" x-text="fmtTime(log.occurred_at)"></td>
                 <td class="px-4 py-2.5">
                   <span class="badge" :class="levelBadge(log.level)" x-text="log.level"></span>
@@ -461,9 +493,9 @@
                 </td>
               </tr>
 
-              <!-- Expanded detail -->
-              <tr x-show="selectedLog?.id === log.id" class="bg-indigo-50/60 dark:bg-indigo-950/20">
-                <td colspan="6" class="px-5 py-4 border-b border-indigo-100 dark:border-indigo-900/30">
+              <!-- Expanded detail row -->
+              <tr x-show="selectedId === log.id" class="bg-indigo-50/60 dark:bg-indigo-950/20">
+                <td colspan="6" class="px-5 py-4">
 
                   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
                     <template x-for="[k, v] in detailFields(log)" :key="k">
@@ -495,8 +527,10 @@
                   </template>
                 </td>
               </tr>
-            </template>
-          </tbody>
+
+            </tbody>
+          </template>
+
         </table>
       </div>
 
@@ -551,7 +585,8 @@ function dashboard() {
     // Data
     logs: [],
     total: 0,
-    selectedLog: null,
+    selectedId: null,   // ID of the expanded row
+    selectedLog: null,  // full object for the expanded row detail panel
     summary: null,
 
     // Charts
@@ -562,6 +597,21 @@ function dashboard() {
     globalError: null,
     autoRefresh: true,
     _timer: null,
+
+    // Unique tenant IDs visible in the current log page (drives quick-fill pills)
+    get uniqueTenants() {
+      if (this.tenantId) return [];
+      const seen = new Set();
+      const out = [];
+      for (const log of this.logs) {
+        if (log.tenant_id && !seen.has(log.tenant_id)) {
+          seen.add(log.tenant_id);
+          out.push(log.tenant_id);
+          if (out.length >= 6) break;
+        }
+      }
+      return out;
+    },
 
     // ---- Stat cards ----
     get statCards() {
@@ -761,6 +811,18 @@ function dashboard() {
     filterLogs() {
       this.page = 1;
       this.loadLogs().catch(e => { this.globalError = e.message; });
+    },
+
+    // Expand / collapse a log row. Uses a string ID so comparison is always
+    // simple equality, avoids object-reference issues in Alpine x-for.
+    toggleExpand(log) {
+      if (this.selectedId === log.id) {
+        this.selectedId = null;
+        this.selectedLog = null;
+      } else {
+        this.selectedId = log.id;
+        this.selectedLog = log;
+      }
     },
 
     prevPage() {
